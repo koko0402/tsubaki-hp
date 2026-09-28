@@ -75,11 +75,15 @@ const PICKUP = {
 };
 
 /* ---------- ギャラリー（作品一覧） ----------
-   file    : images/ の中のファイル名
+   file    : images/ の中のファイル名（1枚だけのとき）
+   files   : 複数枚のときは配列で書く。[ 'images/a.png', 'images/b.png' ]
+             file と files のどちらでもよい。両方あれば files が優先。
+             どちらも無ければ「文章だけの投稿」になる
    artist  : SITE.artists のキー（tsubaki / kanri）
    date    : YYYY-MM-DD
    baseViews / baseHearts : 開設前からの数字を持たせたい時に使う。0でOK
    comments: 最初から付けておきたいコメント
+             （その中の replies が、そのコメントへの返信）
 ------------------------------------------------ */
 const GALLERY = [
   {
@@ -118,7 +122,12 @@ const GALLERY = [
     baseViews: 540, baseHearts: 97,
     comments: [
       { name: 'とおりすがり', text: '色が強くていい', date: '2026-08-02',
-        avatar: { icon: 'cat', color: '#e0783c' } },
+        avatar: { icon: 'cat', color: '#e0783c' },
+        /* replies に入れると、そのコメントへの返信になる */
+        replies: [
+          { name: '椿', text: 'ありがとう。赤はいちばん迷うところ', date: '2026-08-02',
+            avatar: { icon: 'camellia', color: '#c62b3d' } },
+        ] },
       { name: 'ななし', text: 'アイコンにしてほしい', date: '2026-08-03',
         avatar: { icon: 'note', color: '#7a5ba8' } },
     ],
@@ -154,6 +163,31 @@ const GALLERY = [
     desc: '落書き。',
     tags: ['落書き'],
     baseViews: 88, baseHearts: 11,
+    comments: [],
+  },
+
+  /* 複数枚の投稿。files に並べるだけ */
+  {
+    id: 'w007',
+    title: 'ラフから完成まで',
+    files: ['images/sample02.svg', 'images/sample04.svg', 'images/sample06.svg'],
+    artist: 'tsubaki',
+    date: '2026-08-14',
+    desc: '線を引いて、色を置いて、直して。3枚ならべた。',
+    tags: ['メイキング'],
+    baseViews: 88, baseHearts: 19,
+    comments: [],
+  },
+
+  /* 絵のない、文章だけの投稿。file も files も書かない */
+  {
+    id: 'w008',
+    title: '最近のこと',
+    artist: 'tsubaki',
+    date: '2026-08-15',
+    desc: '絵は描けていないが、下書きだけ増えていく。そのうち出す。',
+    tags: ['雑記'],
+    baseViews: 41, baseHearts: 7,
     comments: [],
   },
 ];

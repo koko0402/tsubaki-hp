@@ -86,10 +86,34 @@ button.danger{ background:transparent; color:#ff8f9d; border:1px solid rgba(255,
 .item .t{ font-weight:700; font-size:14px; }
 .item .d{ font-size:11.5px; color:var(--sub); }
 .item .d .badge{ color:var(--gold); }
+.item .t .tag{
+  display:inline-block; vertical-align:1px;
+  font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:999px;
+  background:rgba(232,184,75,.2); color:var(--gold);
+}
 .item .btns{ display:flex; gap:6px; flex-wrap:wrap; flex:0 0 auto; }
 .empty{ color:var(--sub); font-size:13px; padding:8px 0; }
 
-#preview{ max-width:190px; margin-top:12px; border-radius:8px; display:none; }
+/* 選んだ絵をならべる帯。左から順に、そのまま投稿の順番になる */
+.shots{ display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+.shots:empty{ display:none; }
+.shots .shot{
+  position:relative; width:120px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.12); border-radius:8px; padding:6px;
+}
+.shots .shot img{ display:block; width:100%; height:84px; object-fit:contain; background:#000; border-radius:5px; }
+.shots .shot .no{ display:block; margin-top:5px; font-size:11px; color:var(--sub); text-align:center; }
+.shots .shot .ops{ display:flex; gap:4px; justify-content:center; margin-top:4px; }
+.shots .shot .ops button{
+  width:26px; height:24px; padding:0; font-size:12px; line-height:1;
+  border-radius:5px; border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.06); color:var(--ink); cursor:pointer;
+}
+.shots .shot .ops button:hover:not(:disabled){ background:rgba(255,255,255,.16); }
+.shots .shot .ops button:disabled{ opacity:.3; cursor:default; }
+.shots .shot .ops button.x{ color:#ff9b9b; }
+.hint{ margin:6px 0 0; font-size:11.5px; color:var(--sub); }
 .row4{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:14px; }
 input[type=color]{ width:100%; height:38px; padding:2px; cursor:pointer; }
 code{ background:#100b07; padding:1px 6px; border-radius:4px; font-size:12.5px; color:var(--gold); }
@@ -178,8 +202,11 @@ a{ color:var(--gold); }
         <h2 id="workFormTitle">絵を追加する</h2>
 
         <label for="wFile">画像ファイル</label>
-        <input id="wFile" type="file" accept="image/*">
-        <img id="preview" alt="">
+        <input id="wFile" type="file" accept="image/*" multiple>
+        <p class="hint">何枚でも選べる。ならんだ順に、投稿の中で横に送れるようになる。</p>
+        <div id="wShots" class="shots"></div>
+
+        <label class="inline"><input type="checkbox" id="wTextOnly"> 絵なしで出す（文章だけの投稿）</label>
 
         <label for="wTitle">タイトル</label>
         <input id="wTitle" placeholder="例：夕暮れの帰り道">
@@ -561,30 +588,107 @@ function fillArtistOptions(preferred) {
     .join('') || '<option value="tsubaki">椿</option>';
 }
 
+/* ------------------------------------------------------------
+   選んだ絵のならび
+   workImages = [{ path, url, file }]
+     path … すでに保存してある絵。url は見せるためのアドレス
+     file … これから上げる絵。「保存」を押したときに上げる
+   ------------------------------------------------------------ */
+let workImages = [];
+
+/* 見本データの絵は index.html から見た相対パス。
+   この管理ページは1つ下の階層にあるので ../ を足してやる。
+   自分で上げた絵（blob: や http:）はそのまま。 */
+const shotSrc = u => (/^(blob:|data:|https?:|\/|\.\.\/)/.test(String(u)) ? u : '../' + u);
+
+function freeShot(it) {
+  if (it && it.file && String(it.url).startsWith('blob:')) URL.revokeObjectURL(it.url);
+}
+
+function paintShots() {
+  const box = $('#wShots');
+  const textOnly = $('#wTextOnly').checked;
+  box.innerHTML = (textOnly ? [] : workImages).map((it, i) => `
+    <div class="shot">
+      <img src="${esc(shotSrc(it.url))}" alt="">
+      <span class="no">${i + 1}枚目</span>
+      <div class="ops">
+        <button type="button" data-mv="${i}" data-dir="-1" title="前へ"${i === 0 ? ' disabled' : ''}>◀</button>
+        <button type="button" data-mv="${i}" data-dir="1"  title="後ろへ"${i === workImages.length - 1 ? ' disabled' : ''}>▶</button>
+        <button type="button" data-rm="${i}" class="x" title="外す">×</button>
+      </div>
+    </div>`).join('');
+
+  box.querySelectorAll('[data-mv]').forEach(b => b.addEventListener('click', () => {
+    const i = Number(b.dataset.mv), j = i + Number(b.dataset.dir);
+    if (j < 0 || j >= workImages.length) return;
+    const t = workImages[i]; workImages[i] = workImages[j]; workImages[j] = t;
+    paintShots();
+  }));
+  box.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+    freeShot(workImages.splice(Number(b.dataset.rm), 1)[0]);
+    paintShots();
+  }));
+
+  $('#wFile').disabled = textOnly;
+}
+
 $('#wFile').addEventListener('change', e => {
-  const f = e.target.files?.[0];
-  const img = $('#preview');
-  if (!f) { img.style.display = 'none'; return; }
-  img.src = URL.createObjectURL(f);
-  img.style.display = 'block';
+  for (const f of e.target.files || []) {
+    workImages.push({ file: f, url: URL.createObjectURL(f), path: null });
+  }
+  e.target.value = '';      /* 同じ絵をもう一度選べるよう、選択を空に戻す */
+  paintShots();
+});
+
+$('#wTextOnly').addEventListener('change', e => {
+  if (e.target.checked && workImages.length &&
+      !confirm('文章だけの投稿にする。選んである絵は外れる。いい？')) {
+    e.target.checked = false;
+    return;
+  }
+  if (e.target.checked) {
+    workImages.forEach(freeShot);
+    workImages = [];
+  }
+  paintShots();
 });
 
 $('#wSave').addEventListener('click', async () => {
   const btn = $('#wSave');
-  const file = $('#wFile').files?.[0];
   const title = $('#wTitle').value.trim();
+  const textOnly = $('#wTextOnly').checked;
 
-  if (!title)                return say('#wMsg', 'タイトルを入れてください', true);
-  if (!file && !editingWork) return say('#wMsg', '画像を選んでください', true);
+  if (!title) return say('#wMsg', 'タイトルを入れてください', true);
+  if (!textOnly && !workImages.length) {
+    return say('#wMsg', '画像を選んでください（絵なしで出すなら、下のチェックを入れて）', true);
+  }
 
   btn.disabled = true;
   say('#wMsg', '保存中…');
   try {
-    const imagePath = file ? await ADMIN.uploadImage(file) : editingWork.imagePath;
+    /* まだ上げていない絵を、ならんでいる順に上げる */
+    const imagePaths = [];
+    if (!textOnly) {
+      for (let i = 0; i < workImages.length; i++) {
+        const it = workImages[i];
+        if (!it.path) {
+          say('#wMsg', `画像を送っています…（${i + 1}/${workImages.length}）`);
+          it.path = await ADMIN.uploadImage(it.file);
+        }
+        imagePaths.push(it.path);
+      }
+    }
+
+    /* 編集で外した絵は、置き場からも消しておく */
+    const before = (editingWork && editingWork.imagePaths) || [];
+    const gone = before.filter(x => x && imagePaths.indexOf(x) < 0);
+
     await ADMIN.saveWork({
       id:        $('#wId').value.trim() || newWorkId(),
       title,
-      imagePath,
+      imagePaths,
+      imagePath: imagePaths[0] || '',
       artist:    $('#wArtist').value,
       date:      $('#wDate').value || todayISO(),
       desc:      $('#wDesc').value.trim(),
@@ -592,6 +696,7 @@ $('#wSave').addEventListener('click', async () => {
       isPickup:  $('#wPickup').checked,
       pickupOrder: $('#wPickup').checked ? 1 : null,
     });
+    if (gone.length) { try { await ADMIN.removeImages(gone); } catch (err2) { console.warn(err2); } }
     resetWorkForm();
     say('#wMsg', '保存しました');
     await loadWorks();
@@ -607,7 +712,9 @@ $('#wCancel').addEventListener('click', resetWorkForm);
 function resetWorkForm() {
   editingWork = null;
   $('#workFormTitle').textContent = '絵を追加する';
-  $('#wFile').value = ''; $('#preview').style.display = 'none';
+  workImages.forEach(freeShot);
+  workImages = [];
+  $('#wFile').value = ''; $('#wTextOnly').checked = false; paintShots();
   $('#wTitle').value = ''; $('#wDesc').value = ''; $('#wTags').value = '';
   $('#wPickup').checked = false;
   $('#wDate').value = todayISO();
@@ -620,10 +727,11 @@ async function loadWorks() {
     const works = await ADMIN.listWorks();
     box.innerHTML = works.length ? works.map(w => `
       <div class="item">
-        <img src="${esc(w.file)}" alt="">
+        ${w.file ? `<img src="${esc(shotSrc(w.file))}" alt="">` : ''}
         <div class="meta">
-          <div class="t">${esc(w.title)}</div>
+          <div class="t">${w.file ? '' : '<span class="tag">文章だけ</span> '}${esc(w.title)}</div>
           <div class="d">${esc(w.date)} ／ ${esc(settings?.artists?.[w.artist]?.name || w.artist)}
+            ${(w.imagePaths || []).length > 1 ? ` ／ ${(w.imagePaths || []).length}枚` : ''}
             ${w.isPickup ? '<span class="badge">★おすすめ</span>' : ''}</div>
         </div>
         <div class="btns">
@@ -645,7 +753,11 @@ async function loadWorks() {
       $('#wTags').value = (w.tags || []).join(', ');
       $('#wPickup').checked = !!w.isPickup;
       $('#wFile').value = '';
-      $('#preview').src = w.file; $('#preview').style.display = 'block';
+      const paths = (w.imagePaths && w.imagePaths.length) ? w.imagePaths : (w.imagePath ? [w.imagePath] : []);
+      workImages.forEach(freeShot);
+      workImages = paths.map((x, i) => ({ path: x, url: (w.files || [])[i] || w.file, file: null }));
+      $('#wTextOnly').checked = paths.length === 0;
+      paintShots();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }));
 
@@ -660,7 +772,8 @@ async function loadWorks() {
       const w = works.find(x => x.id === b.dataset.del);
       if (!confirm(`「${w.title}」を削除します。元に戻せません。よろしいですか？`)) return;
       b.disabled = true;
-      try { await ADMIN.deleteWork(w.id, w.imagePath); await loadWorks(); say('#wMsg', '削除しました'); }
+      const paths = (w.imagePaths && w.imagePaths.length) ? w.imagePaths : [w.imagePath];
+      try { await ADMIN.deleteWork(w.id, paths); await loadWorks(); say('#wMsg', '削除しました'); }
       catch (err) { say('#wMsg', err.message, true); b.disabled = false; }
     }));
   } catch (err) {
@@ -1005,14 +1118,14 @@ async function loadComments() {
     box.innerHTML = rows.length ? rows.map(c => `
       <div class="item">
         <div class="meta">
-          <div class="t">${esc(c.name)}<span class="d"> ／ ${esc(String(c.created_at).slice(0,10))} ／ ${esc(c.work_id)}</span></div>
+          <div class="t">${c.parent_id ? '<span class="tag">返信</span> ' : ''}${esc(c.name)}<span class="d"> ／ ${esc(String(c.created_at).slice(0,10))} ／ ${esc(c.work_id)}</span></div>
           <div class="d" style="white-space:pre-wrap;color:var(--ink)">${esc(c.body)}</div>
         </div>
         <div class="btns"><button type="button" class="danger small" data-cdel="${esc(c.id)}">削除</button></div>
       </div>`).join('') : '<p class="empty">まだありません。</p>';
 
     box.querySelectorAll('[data-cdel]').forEach(b => b.addEventListener('click', async () => {
-      if (!confirm('このコメントを削除します。よろしいですか？')) return;
+      if (!confirm('このコメントを削除する。ぶら下がっている返信もいっしょに消える。いい？')) return;
       b.disabled = true;
       try { await ADMIN.deleteComment(b.dataset.cdel); await loadComments(); }
       catch (err) { alert(err.message); b.disabled = false; }

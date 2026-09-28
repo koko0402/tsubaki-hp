@@ -71,7 +71,7 @@ function renderProfileChip() {
    おすすめ（横に流れる）
    ============================================================ */
 function renderPickup() {
-  const picks = (state.pickup.workIds || []).map(workById).filter(Boolean);
+  const picks = (state.pickup.workIds || []).map(workById).filter(w => w && !isTextPost(w));
   const hasVideo = !!state.pickup.youtubeId;
 
   $('#pickup').hidden = picks.length === 0 && !hasVideo;
@@ -81,7 +81,7 @@ function renderPickup() {
     const s = statOf(w.id);
     return `
     <button type="button" class="strip-card" data-open="${esc(w.id)}">
-      <img src="${esc(w.file)}" alt="${esc(w.title)}" loading="lazy">
+      <img src="${esc(filesOf(w)[0] || '')}" alt="${esc(w.title)}" loading="lazy">
       <b>${esc(w.title)}</b>
       <small>❤ ${fmtCount(s.hearts)} ・ 💬 ${fmtCount(s.comments)}</small>
     </button>`;
@@ -148,10 +148,7 @@ function postHTML(w) {
         `<li><button type="button" data-tag="${esc(t)}">#${esc(t)}</button></li>`).join('')}</ul>` : ''}
     </div>
 
-    <div class="post-media">
-      <img src="${esc(w.file)}" alt="${esc(w.title)}" loading="lazy"
-           role="button" tabindex="0" data-open="${esc(w.id)}">
-    </div>
+    ${mediaHTML(w)}
 
     <div class="post-counts" data-counts>
       <span><i class="ic">👁</i>${fmtCount(s.views)}</span>
@@ -176,6 +173,39 @@ function postHTML(w) {
 
     <form class="post-write" data-write="${esc(w.id)}">${writeBoxHTML(w.id)}</form>
   </article>`;
+}
+
+/** 投稿の画像。1枚ならそのまま、複数枚なら横に送れるカルーセルにする。
+    画像が無ければ何も出さない（文章だけの投稿） */
+function mediaHTML(w) {
+  const files = filesOf(w);
+  if (!files.length) return '';
+
+  if (files.length === 1) {
+    return `
+    <div class="post-media">
+      <img src="${esc(files[0])}" alt="${esc(w.title)}" loading="lazy"
+           role="button" tabindex="0" data-open="${esc(w.id)}">
+    </div>`;
+  }
+
+  const slides = files.map((f, i) => `
+    <div class="slide">
+      <img src="${esc(f)}" alt="${esc(w.title)} ${i + 1}枚目" loading="lazy"
+           role="button" tabindex="0" data-open="${esc(w.id)}" data-at="${i}">
+    </div>`).join('');
+
+  const dots = files.map((_, i) =>
+    `<i class="${i === 0 ? 'on' : ''}"></i>`).join('');
+
+  return `
+  <div class="post-media multi" data-carousel>
+    <div class="rail">${slides}</div>
+    <button type="button" class="nav prev" data-slide="-1" aria-label="前の絵">‹</button>
+    <button type="button" class="nav next" data-slide="1"  aria-label="次の絵">›</button>
+    <span class="count"><b data-at-label>1</b>/${files.length}</span>
+    <div class="dots">${dots}</div>
+  </div>`;
 }
 
 /** フィードを描く。reset=true で最初から */

@@ -72,7 +72,8 @@ window.Demo = (function () {
       await put('works', {
         id: w.id,
         title: w.title,
-        imagePath: w.file,
+        imagePath: w.file || (w.files && w.files[0]) || '',
+        imagePaths: Array.isArray(w.files) ? w.files : (w.file ? [w.file] : []),
         artist: w.artist,
         date: w.date,
         desc: w.desc || '',
@@ -84,16 +85,20 @@ window.Demo = (function () {
         order: i,
       });
 
-      for (const c of (w.comments || [])) {
+      /* コメントと、そこにぶら下がる返信 */
+      const seedComment = async (c, workId, parentId) => {
+        const id = uid();
         await put('comments', {
-          id: uid(), workId: w.id,
+          id, workId, parentId: parentId || null,
           name: c.name, body: c.text, date: c.date || todayStr(),
           avatarIcon: c.avatar?.icon || null,
           avatarColor: c.avatar?.color || null,
           avatarUrl: c.avatar?.url || null,
           createdAt: (c.date || todayStr()) + 'T00:00:00',
         });
-      }
+        for (const r of (c.replies || [])) await seedComment(r, workId, id);
+      };
+      for (const c of (w.comments || [])) await seedComment(c, w.id, null);
     }
 
     for (const p of BLOG) {
@@ -145,8 +150,11 @@ window.Demo = (function () {
     return {
       id: row.id,
       title: row.title,
-      file: await imageUrl(row.imagePath),
+      file: row.imagePath ? await imageUrl(row.imagePath) : '',
+      files: await Promise.all((row.imagePaths || (row.imagePath ? [row.imagePath] : []))
+               .map(p => imageUrl(p))),
       imagePath: row.imagePath,
+      imagePaths: row.imagePaths || [],
       artist: row.artist,
       date: row.date,
       desc: row.desc || '',
@@ -159,6 +167,7 @@ window.Demo = (function () {
   const toComment = row => ({
     id: row.id,
     workId: row.workId,
+    parentId: row.parentId || null,
     name: row.name,
     text: row.body,
     date: row.date,
@@ -237,7 +246,8 @@ window.Demo = (function () {
       const rows = await getAll('comments');
       const out = {};
       for (const id of ids) {
-        const list = rows.filter(c => c.workId === id)
+        /* フィードに出すのは、いちばん上のコメントだけ（返信は開いてから見る） */
+        const list = rows.filter(c => c.workId === id && !c.parentId)
           .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
           .slice(-perWork).map(toComment);
         if (list.length) out[id] = list;
@@ -245,10 +255,10 @@ window.Demo = (function () {
       return out;
     },
 
-    async addComment(workId, profile, text) {
+    async addComment(workId, profile, text, parentId = null) {
       const now = new Date().toISOString();
       await put('comments', {
-        id: uid(), workId,
+        id: uid(), workId, parentId: parentId || null,
         name: profile.name, body: text, date: todayStr(),
         avatarIcon: profile.url ? null : profile.icon,
         avatarColor: profile.url ? null : profile.color,
@@ -312,13 +322,28 @@ window.Demo = (function () {
       return key;
     },
 
+    /** いらなくなった絵を置き場から消す（編集で外したときに使う） */
+    async removeImages(paths) {
+      for (const p of (paths || [])) {
+        if (!String(p).startsWith('idb:')) continue;
+        await del('images', p);
+        const url = urlCache.get(p);
+        if (url) { URL.revokeObjectURL(url); urlCache.delete(p); }
+      }
+    },
+
     async saveWork(work) {
       const old = (await getKey('works', work.id)) || {};
+      /* 絵は何枚でも持てる。imagePath は「1枚目」で、古い作りとの互換用 */
+      const paths = Array.isArray(work.imagePaths)
+        ? work.imagePaths.filter(Boolean)
+        : (work.imagePath ? [work.imagePath] : []);
       await put('works', {
         ...old,
         id: work.id,
         title: work.title,
-        imagePath: work.imagePath,
+        imagePath: paths[0] || '',
+        imagePaths: paths,
         artist: work.artist,
         date: work.date,
         desc: work.desc || '',
@@ -342,10 +367,14 @@ window.Demo = (function () {
       await del('works', id);
       const rows = await getAll('comments');
       for (const c of rows) if (c.workId === id) await del('comments', c.id);
-      if (imagePath?.startsWith('idb:')) {
-        await del('images', imagePath);
-        const url = urlCache.get(imagePath);
-        if (url) { URL.revokeObjectURL(url); urlCache.delete(imagePath); }
+
+      /* 1枚でも複数枚でも受け取れるようにしておく */
+      const paths = (Array.isArray(imagePath) ? imagePath : [imagePath]).filter(Boolean);
+      for (const p of paths) {
+        if (!String(p).startsWith('idb:')) continue;
+        await del('images', p);
+        const url = urlCache.get(p);
+        if (url) { URL.revokeObjectURL(url); urlCache.delete(p); }
       }
     },
 
@@ -363,10 +392,16 @@ window.Demo = (function () {
       return (await getAll('comments'))
         .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
         .slice(0, 100)
-        .map(c => ({ id: c.id, work_id: c.workId, name: c.name, body: c.body, created_at: c.createdAt }));
+        .map(c => ({ id: c.id, work_id: c.workId, parent_id: c.parentId || null,
+                     name: c.name, body: c.body, created_at: c.createdAt }));
     },
 
-    async deleteComment(id) { await del('comments', id); },
+    /* 親を消したら、そこにぶら下がっていた返信もいっしょに消す */
+    async deleteComment(id) {
+      const rows = await getAll('comments');
+      for (const c of rows) if (c.parentId === id) await del('comments', c.id);
+      await del('comments', id);
+    },
 
     /** 全部消して、js/data.js の中身に戻す */
     async reset() {

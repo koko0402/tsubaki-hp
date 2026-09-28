@@ -38,12 +38,34 @@ function bindInfiniteScroll() {
    イベント
    ============================================================ */
 function bindUI() {
+  /* ---- 複数枚の投稿を横に送る ---- */
+  document.addEventListener('click', e => {
+    const nav = e.target.closest('[data-slide]');
+    if (!nav) return;
+    e.preventDefault();
+    const box = nav.closest('[data-carousel]');
+    const rail = box.querySelector('.rail');
+    rail.scrollBy({ left: rail.clientWidth * Number(nav.dataset.slide), behavior: 'smooth' });
+  });
+
+  /* 送ったら、丸と枚数の表示を合わせる */
+  document.addEventListener('scroll', e => {
+    const rail = e.target;
+    if (!rail.classList || !rail.classList.contains('rail')) return;
+    const box = rail.closest('[data-carousel]');
+    if (!box) return;
+    const at = Math.round(rail.scrollLeft / Math.max(1, rail.clientWidth));
+    box.querySelectorAll('.dots i').forEach((d, i) => d.classList.toggle('on', i === at));
+    const lab = box.querySelector('[data-at-label]');
+    if (lab) lab.textContent = String(at + 1);
+  }, true);
+
   document.addEventListener('click', e => {
     const tagBtn = e.target.closest('[data-tag]');
     if (tagBtn) { e.preventDefault(); setTag(tagBtn.dataset.tag); return; }
 
     const open = e.target.closest('[data-open]');
-    if (open) { openLightbox(open.dataset.open); return; }
+    if (open) { openLightbox(open.dataset.open, Number(open.dataset.at) || 0); return; }
 
     const heart = e.target.closest('[data-heart]');
     if (heart) { toggleHeartFor(heart.dataset.heart, heart); return; }
@@ -76,7 +98,7 @@ function bindUI() {
     const btn = e.target.closest?.('[data-open]');
     if (!btn || btn.tagName === 'BUTTON') return;
     e.preventDefault();
-    openLightbox(btn.dataset.open);
+    openLightbox(btn.dataset.open, Number(btn.dataset.at) || 0);
   });
 
   $('#topHome').addEventListener('click', goHome);

@@ -15,7 +15,7 @@ function tileHTML(w) {
   const s = statOf(w.id);
   return `
   <button type="button" class="tile" data-open="${esc(w.id)}" aria-label="${esc(w.title)} を大きく見る">
-    <img src="${esc(w.file)}" alt="${esc(w.title)}" loading="lazy">
+    <img src="${esc(filesOf(w)[0] || '')}" alt="${esc(w.title)}" loading="lazy">
     <span class="tile-info">
       <b>${esc(w.title)}</b>
       <small>❤ ${fmtCount(s.hearts)} ・ 💬 ${fmtCount(s.comments)}</small>
@@ -29,12 +29,14 @@ const pinSVG = (cls = 'card-pin') =>
 function cardHTML(w, i = 0) {
   const a = artistOf(w.artist);
   const s = statOf(w.id);
+  const files = filesOf(w);
   return `
   <article class="card" data-rot="${i % 4}" data-pin="${i % 3}">
     ${pinSVG()}
     <div class="card-frame" role="button" tabindex="0" data-open="${esc(w.id)}"
          aria-label="${esc(w.title)} を大きく見る">
-      <img class="card-img" src="${esc(w.file)}" alt="${esc(w.title)}" loading="lazy">
+      ${files.length > 1 ? `<span class="card-many">${files.length}枚</span>` : ''}
+      <img class="card-img" src="${esc(files[0] || '')}" alt="${esc(w.title)}" loading="lazy">
       <div class="card-body">
         <h3 class="card-title">${esc(w.title)}</h3>
         <p class="card-sub">
@@ -94,7 +96,8 @@ function scheduleWallLayout() {
 }
 
 function renderWall() {
-  state.visible = currentList();
+  /* 壁は絵を貼る場所なので、文章だけの投稿はここには出さない */
+  state.visible = currentList().filter(w => !isTextPost(w));
   const wall = $('#wall');
 
   /* HTML文字列から要素を作っておいて、あとで列に振り分ける */

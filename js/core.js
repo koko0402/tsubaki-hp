@@ -202,6 +202,17 @@ function applyCustomCss() {
 }
 
 /** 3つまとめて */
+/** 作品が持っている画像を配列で返す。
+    1枚だけの投稿でも、複数枚の投稿でも、これを通せば同じ形になる。
+    画像のない投稿（文章だけ）は空の配列。 */
+function filesOf(w) {
+  if (Array.isArray(w?.files) && w.files.length) return w.files.filter(Boolean);
+  return w?.file ? [w.file] : [];
+}
+
+/** 文章だけの投稿か */
+function isTextPost(w) { return filesOf(w).length === 0; }
+
 function applyLook() {
   applyTheme();
   applySections();

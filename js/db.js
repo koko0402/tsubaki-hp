@@ -58,8 +58,11 @@ window.DB = (function () {
     return {
       id: row.id,
       title: row.title,
-      file: imageUrl(row.image_path),
+      file: row.image_path ? imageUrl(row.image_path) : '',
+      files: (row.image_paths && row.image_paths.length ? row.image_paths
+              : (row.image_path ? [row.image_path] : [])).map(imageUrl),
       imagePath: row.image_path,
+      imagePaths: row.image_paths || [],
       artist: row.artist,
       date: row.posted_on,
       desc: row.description || '',
@@ -77,6 +80,7 @@ window.DB = (function () {
   const toComment = row => ({
     id: row.id,
     workId: row.work_id,
+    parentId: row.parent_id || null,
     name: row.name,
     text: row.body,
     date: String(row.created_at).slice(0, 10),
@@ -152,9 +156,11 @@ window.DB = (function () {
     /** フィード用：複数の作品の新しいコメントをまとめて取る → { workId: [...] } */
     async recentComments(ids, perWork = 2) {
       if (!ids.length) return {};
+      /* フィードに出すのは、いちばん上のコメントだけ（返信は開いてから見る） */
       const rows = ok(await sb.from('comments')
         .select('*')
         .in('work_id', ids)
+        .is('parent_id', null)
         .order('created_at', { ascending: false })
         .limit(300), 'コメントの読み込み') || [];
 
@@ -166,10 +172,11 @@ window.DB = (function () {
       return out;
     },
 
-    async addComment(workId, profile, text) {
+    async addComment(workId, profile, text, parentId = null) {
       const user = (await sb.auth.getUser()).data.user;
       ok(await sb.from('comments').insert({
         work_id:      workId,
+        parent_id:    parentId || null,
         name:         profile.name,
         body:         text,
         avatar_icon:  profile.url ? null : profile.icon,
@@ -275,11 +282,22 @@ window.DB = (function () {
       return path;
     },
 
+    /** いらなくなった絵を置き場から消す（編集で外したときに使う） */
+    async removeImages(paths) {
+      const list = (paths || []).filter(p => p && !/^https?:/.test(p));
+      if (list.length) await sb.storage.from(BUCKET).remove(list);
+    },
+
     async saveWork(work) {
+      /* 絵は何枚でも持てる。image_path は「1枚目」で、古い作りとの互換用 */
+      const paths = Array.isArray(work.imagePaths)
+        ? work.imagePaths.filter(Boolean)
+        : (work.imagePath ? [work.imagePath] : []);
       ok(await sb.from('works').upsert({
         id:           work.id,
         title:        work.title,
-        image_path:   work.imagePath,
+        image_path:   paths[0] || '',
+        image_paths:  paths,
         artist:       work.artist,
         posted_on:    work.date,
         description:  work.desc || '',
@@ -296,8 +314,12 @@ window.DB = (function () {
 
     async deleteWork(id, imagePath) {
       ok(await sb.from('works').delete().eq('id', id), '作品の削除');
-      if (imagePath && !/^https?:/.test(imagePath)) {
-        await sb.storage.from(BUCKET).remove([imagePath]);   // 消せなくても致命的ではない
+
+      /* 1枚でも複数枚でも受け取れるようにしておく */
+      const paths = (Array.isArray(imagePath) ? imagePath : [imagePath])
+        .filter(p => p && !/^https?:/.test(p));
+      if (paths.length) {
+        await sb.storage.from(BUCKET).remove(paths);   // 消せなくても致命的ではない
       }
     },
 

@@ -54,6 +54,10 @@ alter table public.site_settings
 --   bg_mode は 'cover'（全面に伸ばす）か 'tile'（並べて敷き詰める）。
 --   bg_dim は背景を暗くする度合い 0〜0.7。明るい絵で文字が読みにくいときに上げます。
 -- 見た目（色・角丸・影・フォント・幅）／ページの出し分け／自分で足すCSS
+-- 1投稿に複数枚の絵。空なら image_path の1枚だけ
+alter table public.works
+  add column if not exists image_paths text[] not null default '{}';
+
 alter table public.site_settings
   add column if not exists theme      jsonb not null default '{}'::jsonb;
 alter table public.site_settings
@@ -124,7 +128,14 @@ alter table public.comments
   add column if not exists visitor_id   uuid,
   add column if not exists user_id      uuid references auth.users(id) on delete set null;
 
-create index if not exists comments_work_idx on public.comments (work_id, created_at);
+-- 返信（コメントにぶら下がるコメント）
+-- parent_id が空なら、それはいちばん上のコメント。
+-- 入っていれば、そのコメントへの返信。親を消すと返信もまとめて消えます。
+alter table public.comments
+  add column if not exists parent_id uuid references public.comments(id) on delete cascade;
+
+create index if not exists comments_work_idx   on public.comments (work_id, created_at);
+create index if not exists comments_parent_idx on public.comments (parent_id);
 
 -- ------------------------------------------------------------
 -- 6. ハート／閲覧

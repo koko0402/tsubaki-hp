@@ -515,6 +515,13 @@ body.has-bg::before{ opacity:.12; }
 .card[data-pin="0"] .card-pin{ transform:translateX(-50%) rotate(-14deg); }
 .card[data-pin="1"] .card-pin{ transform:translateX(-50%) rotate(11deg); }
 .card-img{ display:block; width:100%; height:auto; background:#ddd6c8; border-radius:1px; }
+/* 壁のカードに「3枚」と出す（複数枚の投稿のとき） */
+.card-many{
+  position:absolute; top:22px; right:22px; z-index:2;
+  padding:2px 9px; border-radius:999px;
+  font-size:11px; font-weight:700; color:#fff;
+  background:rgba(20,12,6,.6);
+}
 .card-body{ padding:12px 2px 14px; }
 .card-title{ margin:0; font-family:var(--font-serif); font-size:17px; font-weight:600; letter-spacing:.03em; }
 .card-sub{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:4px 0 0; font-size:11.5px; color:var(--ink-soft); }
@@ -688,6 +695,28 @@ body.has-bg::before{ opacity:.12; }
 
 .lb-hint{ position:absolute; left:0; right:0; bottom:16px; margin:0; text-align:center; font-size:11px; color:rgba(240,226,204,.55); }
 
+/* 複数枚の投稿を開いたときの「2 / 3」 */
+.lb-count{
+  position:absolute; top:18px; left:50%; transform:translateX(-50%);
+  margin:0; padding:5px 14px;
+  font-size:12.5px; color:#f0e2cc; font-variant-numeric:tabular-nums;
+  background:rgba(20,12,5,.72);
+  border:1px solid rgba(255,255,255,.16);
+  border-radius:999px;
+}
+.lb-count[hidden]{ display:none; }
+
+/* 文章だけの投稿を開いたとき。左の絵の場所ごと消す */
+.lb.is-textonly .lb-stage,
+.lb.is-textonly .lb-prev,
+.lb.is-textonly .lb-next{ display:none; }
+.lb.is-textonly .lb-body{ padding:4vh 16px; }
+.lb.is-textonly .lb-side{
+  width:min(620px, 100%); flex:0 1 auto; margin:auto;
+  max-height:92vh; border-radius:14px;
+  box-shadow:0 24px 60px rgba(0,0,0,.6);
+}
+
 .lb-btn{
   position:absolute; z-index:5;
   display:flex; align-items:center; justify-content:center;
@@ -754,18 +783,56 @@ body.has-bg::before{ opacity:.12; }
 
 .comment-list{ list-style:none; margin:0; padding:0; display:grid; gap:10px; }
 .comment-list li{
-  display:flex; gap:9px;
   padding:10px 12px;
   background:rgba(255,255,255,.72);
   border:1px solid rgba(0,0,0,.08);
   border-radius:8px; font-size:13px;
 }
+.comment-list .c-item{ display:flex; gap:9px; }
 .comment-list .c-main{ flex:1; min-width:0; }
 .comment-list .c-head{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:11px; color:var(--ink-soft); margin-bottom:3px; }
 .comment-list .c-name{ font-weight:700; color:var(--ink); font-size:12.5px; }
 .comment-list .c-text{ margin:0; white-space:pre-wrap; word-break:break-word; }
 .comment-empty{ display:block; font-size:12.5px; color:var(--ink-soft); }
 .c-verified{ color:#3d7ea6; font-size:10px; margin-left:3px; }
+
+/* ---------- 返信 ---------- */
+.c-reply-btn{
+  margin-top:4px; padding:0; border:0; background:none; cursor:pointer;
+  font:inherit; font-size:11.5px; color:var(--ink-soft);
+}
+.c-reply-btn:hover{ color:var(--camellia); text-decoration:underline; }
+
+/* 返信は、親より少し内側に入れて、左に細い線を引く */
+.comment-list .c-replies{
+  margin:8px 0 0 14px; padding-left:12px;
+  border-left:2px solid rgba(0,0,0,.09);
+  display:grid; gap:8px;
+}
+.comment-list .c-item.is-reply{ font-size:12.5px; }
+.comment-list .c-item.is-reply .c-name{ font-size:12px; }
+
+.c-replybox{
+  display:flex; align-items:center; gap:7px;
+  margin:8px 0 0 14px; padding-left:12px;
+  border-left:2px solid rgba(0,0,0,.09);
+}
+.comment-list .c-replies .c-replybox{ margin-left:0; padding-left:0; border-left:0; }
+.c-replybox input{
+  flex:1; min-width:0;
+  padding:7px 10px; font:inherit; font-size:12.5px;
+  background:#fff; border:1px solid rgba(0,0,0,.16); border-radius:999px;
+}
+.c-replybox input:focus{ outline:2px solid var(--camellia); outline-offset:1px; }
+.c-replybox button{
+  border:0; cursor:pointer; font:inherit; font-size:12px;
+  padding:7px 12px; border-radius:999px;
+  background:var(--camellia); color:#fff; font-weight:700;
+}
+.c-replybox button:hover{ background:var(--camellia-dark); }
+.c-replybox button.c-cancel{ background:none; color:var(--ink-soft); font-weight:400; padding:7px 4px; }
+.c-replybox button.c-cancel:hover{ color:var(--camellia); background:none; }
+.c-replybox button:disabled{ opacity:.5; cursor:default; }
 
 .comment-gate{
   margin-top:14px; padding:16px 14px; text-align:center;
@@ -1001,3 +1068,58 @@ body.no-shadow .card-pin{
 /* hidden 属性は display 指定に負けるので、明示的に消しておく。
    （管理ページ → 見た目 → 出すページ のチェックを外したときに効く） */
 .bottomnav button[hidden]{ display:none !important; }
+
+/* ============================================================
+   複数枚の投稿（横に送るカルーセル）
+   ============================================================ */
+.post-media.multi{ position:relative; }
+.post-media.multi .rail{
+  display:flex; align-items:stretch;
+  overflow-x:auto; scroll-snap-type:x mandatory;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+.post-media.multi .rail::-webkit-scrollbar{ display:none; }
+/* 枠の高さはいちばん縦長の絵に合わせる。
+   ほかの絵は、その枠のまんなかに置く（下に寄ってスカスカに見えないように） */
+.post-media.multi .slide{
+  flex:0 0 100%; min-width:0; scroll-snap-align:center;
+  display:flex; align-items:center; justify-content:center;
+}
+.post-media.multi .slide img{
+  display:block; width:100%; height:auto; max-height:78vh; object-fit:contain; cursor:zoom-in;
+}
+
+.post-media.multi .nav{
+  position:absolute; top:50%; transform:translateY(-50%);
+  width:34px; height:34px; border-radius:50%; border:0; cursor:pointer;
+  background:rgba(20,12,6,.5); color:#fff; font-size:20px; line-height:1;
+  display:grid; place-items:center; opacity:0; transition:opacity .2s;
+}
+.post-media.multi:hover .nav{ opacity:1; }
+.post-media.multi .nav.prev{ left:8px; }
+.post-media.multi .nav.next{ right:8px; }
+.post-media.multi .nav:disabled{ opacity:0 !important; }
+
+.post-media.multi .count{
+  position:absolute; top:10px; right:10px;
+  background:rgba(20,12,6,.6); color:#fff; font-size:12px;
+  padding:3px 10px; border-radius:999px;
+}
+.post-media.multi .dots{
+  position:absolute; left:0; right:0; bottom:8px;
+  display:flex; justify-content:center; gap:5px; pointer-events:none;
+}
+.post-media.multi .dots i{
+  width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.55);
+  transition:background .2s, transform .2s;
+}
+.post-media.multi .dots i.on{ background:#fff; transform:scale(1.35); }
+
+/* 指で送れることを伝える（スマホでは矢印を常に出す） */
+@media (hover:none){
+  .post-media.multi .nav{ opacity:.85; }
+}
+
+/* 文章だけの投稿 */
+.post.is-text .post-text{ padding-bottom:4px; }
+.post.is-text .post-title{ font-size:19px; }
