@@ -221,10 +221,65 @@
     <input id="pfName" maxlength="20" placeholder="20文字まで" autocomplete="nickname">
 
     <p class="pf-label">アイコン</p>
-    <div class="pf-icons" id="pfIcons"></div>
+    <div class="pf-tabs" role="tablist">
+      <button type="button" class="pf-tab is-on" data-pftab="pick" role="tab">えらぶ</button>
+      <button type="button" class="pf-tab"       data-pftab="draw" role="tab">描く</button>
+      <button type="button" class="pf-tab"       data-pftab="photo" role="tab">写真</button>
+    </div>
 
-    <p class="pf-label">色</p>
-    <div class="pf-colors" id="pfColors"></div>
+    <!-- ① えらぶ -->
+    <section class="pf-pane is-on" data-pfpane="pick">
+      <div class="pf-icons" id="pfIcons"></div>
+      <p class="pf-label">色</p>
+      <div class="pf-colors" id="pfColors"></div>
+    </section>
+
+    <!-- ② 描く -->
+    <section class="pf-pane" data-pfpane="draw">
+      <div class="pf-canvas-wrap">
+        <canvas id="pfDraw" width="256" height="256"></canvas>
+      </div>
+      <div class="pf-tools">
+        <div class="pf-swatches" id="pfBrushColors"></div>
+        <div class="pf-row">
+          <span class="pf-tool-label">太さ</span>
+          <button type="button" class="pf-size is-on" data-size="6"><i style="width:6px;height:6px"></i></button>
+          <button type="button" class="pf-size" data-size="14"><i style="width:14px;height:14px"></i></button>
+          <button type="button" class="pf-size" data-size="28"><i style="width:28px;height:28px"></i></button>
+          <button type="button" class="pf-mini" id="pfEraser">消しゴム</button>
+        </div>
+        <div class="pf-row">
+          <span class="pf-tool-label">下地</span>
+          <div class="pf-swatches sm" id="pfBgColors"></div>
+        </div>
+        <div class="pf-row">
+          <button type="button" class="pf-mini" id="pfUndo">ひとつ戻す</button>
+          <button type="button" class="pf-mini" id="pfWipe">ぜんぶ消す</button>
+          <button type="button" class="pf-mini strong" id="pfUseDraw">この絵を使う</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ 写真 -->
+    <section class="pf-pane" data-pfpane="photo">
+      <div class="pf-canvas-wrap">
+        <canvas id="pfCrop" width="256" height="256"></canvas>
+        <p class="pf-empty" id="pfCropEmpty">写真を選ぶと、ここに出る</p>
+      </div>
+      <div class="pf-tools">
+        <div class="pf-row">
+          <input type="file" id="pfFile" accept="image/*" class="pf-file">
+        </div>
+        <div class="pf-row" id="pfCropCtrl" hidden>
+          <span class="pf-tool-label">大きさ</span>
+          <input type="range" id="pfZoom" min="100" max="320" value="100">
+        </div>
+        <p class="pf-note" id="pfCropHint" hidden>まるの中をドラッグすると、位置を動かせる。</p>
+        <div class="pf-row">
+          <button type="button" class="pf-mini strong" id="pfUsePhoto" disabled>この写真を使う</button>
+        </div>
+      </div>
+    </section>
 
     <div class="pf-google" id="pfGoogle" hidden>
       <button type="button" class="pf-gbtn" id="pfGoogleBtn">

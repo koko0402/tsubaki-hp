@@ -917,3 +917,69 @@ body.has-bg::before{ opacity:.12; }
   *{ transition:none !important; animation:none !important; }
   html{ scroll-behavior:auto; }
 }
+
+/* ============================================================
+   プロフィールのアイコン作り（えらぶ／描く／写真）
+   ============================================================ */
+.pf-tabs{ display:flex; gap:6px; margin:4px 0 12px; }
+.pf-tab{
+  flex:1; font:inherit; font-size:13px; padding:7px 0; cursor:pointer;
+  color:var(--ink-soft); background:rgba(0,0,0,.04);
+  border:1.5px solid rgba(44,32,24,.14); border-radius:8px;
+  transition:background .15s, color .15s, border-color .15s;
+}
+.pf-tab:hover{ border-color:var(--camellia); color:var(--camellia); }
+.pf-tab.is-on{ background:var(--camellia); border-color:var(--camellia); color:#fff; font-weight:700; }
+
+.pf-pane{ display:none; }
+.pf-pane.is-on{ display:block; }
+
+/* 描く・写真の共通枠 */
+.pf-canvas-wrap{
+  position:relative; width:230px; height:230px; margin:0 auto 12px;
+  border-radius:50%; overflow:hidden;
+  border:2px solid rgba(44,32,24,.18);
+  box-shadow:0 3px 10px rgba(0,0,0,.14);
+  background:
+    repeating-conic-gradient(#efe9df 0% 25%, #fbf7f0 0% 50%) 50% / 16px 16px;
+  touch-action:none;                 /* 指で描くときに画面が動かないように */
+}
+.pf-canvas-wrap canvas{ display:block; width:100%; height:100%; cursor:crosshair; }
+.pf-empty{
+  position:absolute; inset:0; display:grid; place-items:center;
+  font-size:12.5px; color:var(--ink-faint); text-align:center; padding:0 20px; margin:0;
+  pointer-events:none;
+}
+
+.pf-tools{ display:grid; gap:9px; }
+.pf-row{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+/* hidden 属性は display:flex に負けるので、明示的に消す */
+.pf-row[hidden], .pf-note[hidden], .pf-empty[hidden]{ display:none; }
+.pf-tool-label{ font-size:12px; color:var(--ink-soft); flex:none; }
+
+.pf-swatches{ display:flex; flex-wrap:wrap; gap:5px; }
+.pf-swatches button{
+  width:24px; height:24px; border-radius:6px; cursor:pointer;
+  border:2px solid rgba(255,255,255,.9); box-shadow:0 0 0 1px rgba(44,32,24,.2);
+}
+.pf-swatches button.is-on{ box-shadow:0 0 0 2px var(--camellia); }
+.pf-swatches.sm button{ width:20px; height:20px; border-radius:5px; }
+
+.pf-size{
+  width:34px; height:30px; display:grid; place-items:center; cursor:pointer;
+  background:#fff; border:1.5px solid rgba(44,32,24,.2); border-radius:7px;
+}
+.pf-size i{ display:block; border-radius:50%; background:var(--ink); }
+.pf-size.is-on{ border-color:var(--camellia); background:#fff4f2; }
+
+.pf-mini{
+  font:inherit; font-size:12.5px; padding:6px 13px; cursor:pointer;
+  background:#fff; color:var(--ink); border:1.5px solid rgba(44,32,24,.22); border-radius:999px;
+}
+.pf-mini:hover{ border-color:var(--camellia); color:var(--camellia); }
+.pf-mini.strong{ background:var(--camellia); border-color:var(--camellia); color:#fff; font-weight:700; }
+.pf-mini.strong:hover{ background:var(--camellia-dark); color:#fff; }
+.pf-mini:disabled{ opacity:.45; cursor:not-allowed; border-color:rgba(44,32,24,.18); color:var(--ink-faint); }
+
+.pf-file{ font-size:12.5px; width:100%; }
+#pfZoom{ flex:1; accent-color:var(--camellia); }

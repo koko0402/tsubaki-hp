@@ -1,9 +1,13 @@
 /* ============================================================
    profile.js — 見に来た人のプロフィール（なまえ＋アイコン）
    ------------------------------------------------------------
-   コメントするには、最低でも「なまえ」と「アイコン」が必要です。
-   Googleと紐づけると、Googleの名前と写真をそのまま使えます。
-   保存先はこのブラウザ（localStorage）です。
+   コメントするには、最低でも「なまえ」と「アイコン」が必要。
+   アイコンは3通り作れる。
+     ・えらぶ … 用意された絵柄から選ぶ
+     ・描く   … その場で描く（image に画像として入る）
+     ・写真   … 手持ちの写真を丸く切り抜く（同上）
+   Googleと紐づけると、Googleの名前と写真をそのまま使える。
+   保存先はこのブラウザ（localStorage）。
    ============================================================ */
 'use strict';
 
@@ -64,7 +68,7 @@ window.Profile = (function () {
   function get() {
     try {
       const p = JSON.parse(localStorage.getItem(KEY));
-      if (p && p.name && (p.icon || p.url)) return p;
+      if (p && p.name && (p.image || p.icon || p.url)) return p;
     } catch {}
     return null;
   }
@@ -74,19 +78,38 @@ window.Profile = (function () {
       name:  String(p.name || '').trim().slice(0, 20),
       icon:  ICONS[p.icon] ? p.icon : 'camellia',
       color: COLORS.includes(p.color) ? p.color : COLORS[0],
-      url:   p.url || null,
+      image: isDataImage(p.image) ? p.image : null,   /* 描いた絵・切り抜いた写真 */
+      url:   p.url || null,                           /* Google の写真 */
       linked: !!p.linked,
     };
-    if (!clean.name) throw new Error('なまえを入れてください');
-    try { localStorage.setItem(KEY, JSON.stringify(clean)); } catch {}
+    if (!clean.name) throw new Error('なまえを入れて');
+    try {
+      localStorage.setItem(KEY, JSON.stringify(clean));
+    } catch (e) {
+      /* 画像が大きすぎて入らないことがある。そのときは画像だけ捨てる */
+      if (clean.image) {
+        clean.image = null;
+        try { localStorage.setItem(KEY, JSON.stringify(clean)); } catch {}
+        throw new Error('画像が大きすぎて保存できなかった。描き直すか、別の写真で試して');
+      }
+      throw e;
+    }
     return clean;
   }
 
   function clear() { try { localStorage.removeItem(KEY); } catch {} }
 
   /* ---------- 表示 ---------- */
+  /** data URL の画像かどうか（変なものを入れられないように） */
+  function isDataImage(v) {
+    return typeof v === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(v) && v.length < 900000;
+  }
+
   function avatarHTML(av, size = 34) {
     const px = `width:${size}px;height:${size}px`;
+    if (av?.image) {
+      return `<span class="ava" style="${px}"><img src="${esc(av.image)}" alt=""></span>`;
+    }
     if (av?.url) {
       return `<span class="ava" style="${px}"><img src="${esc(av.url)}" alt="" referrerpolicy="no-referrer"></span>`;
     }
@@ -98,5 +121,5 @@ window.Profile = (function () {
             </span>`;
   }
 
-  return { ICONS, COLORS, get, save, clear, avatarHTML, esc };
+  return { ICONS, COLORS, get, save, clear, avatarHTML, esc, isDataImage };
 })();
