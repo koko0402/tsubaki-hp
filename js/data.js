@@ -28,6 +28,31 @@ const SITE = {
   bgMode:  'cover',
   bgDim:   0.25,
 
+  /* 見た目。管理ページ → 見た目 から変えられる。
+     ここは「最初の状態」なので、ふだんは触らなくていい */
+  theme: {
+    camellia: '#c62b3d',   // 主役の色（ボタン・画鋲・強調）
+    gold:     '#e8b84b',   // 差し色
+    ink:      '#2b2018',   // 文字
+    paper:    '#fdfbf5',   // カードの紙
+    wood:     '#5e3c20',   // 壁の木の色
+    radius:   12,          // 角の丸み(px)
+    shadow:   100,         // 影の強さ(%)  0で影なし
+    font:     'sans',      // sans / serif / round
+    feedW:    620,         // フィードの幅(px)
+  },
+
+  /* 下のナビに出すページ。false にすると消える。label で名前も変えられる */
+  sections: {
+    home: { on: true, label: 'ホーム' },
+    wall: { on: true, label: 'ギャラリー' },
+    blog: { on: true, label: 'ブログ' },
+    me:   { on: true, label: 'わたし' },
+  },
+
+  /* 自分でCSSを足したいとき。ここに書いたものが最後に効く */
+  customCss: '',
+
   /* 投稿者（絵を貼れる人）。表示名・色・アイコン。ログインとは別物
      icon に使えるもの: camellia / star / moon / cat / leaf / drop / note / heart */
   artists: {

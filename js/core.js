@@ -53,7 +53,9 @@ const state = {
   online: false,
   tag:    '',
   site:   { title: '', tagline: '', links: [], artists: {},
-            bgImage: '', bgMode: 'cover', bgDim: .25, requireLogin: false },
+            bgImage: '', bgMode: 'cover', bgDim: .25,
+            theme: {}, sections: {}, customCss: '',
+            requireLogin: false },
   pickup: { message: '', workIds: [], youtubeId: '', youtubeTitle: '' },
   gallery: [],
   blog: [],
@@ -106,4 +108,102 @@ function toast(text) {
   el.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.hidden = true; }, 2400);
+}
+
+
+/* ============================================================
+   見た目を当てる（テーマ・ページの出し分け・自分で足すCSS）
+   ------------------------------------------------------------
+   style.css の :root に入っている値を、設定で上書きする。
+   CSS変数を書き換えるだけなので、どの部品も自動で追従する。
+   ============================================================ */
+
+const FONT_STACKS = {
+  sans:  '"Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",Meiryo,system-ui,sans-serif',
+  serif: '"Yu Mincho","YuMincho","Hiragino Mincho ProN","Noto Serif JP",serif',
+  round: '"Zen Maru Gothic","Hiragino Maru Gothic ProN","M PLUS Rounded 1c",sans-serif',
+};
+
+/** #rrggbb を少し暗くする（hover 用の色を自動で作る） */
+function darken(hex, amount) {
+  const m = String(hex || '').replace('#', '');
+  if (m.length !== 6) return hex;
+  const p = [0, 2, 4].map(i => {
+    const v = Math.round(parseInt(m.slice(i, i + 2), 16) * (1 - amount));
+    return Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0');
+  });
+  return '#' + p.join('');
+}
+
+function applyTheme() {
+  const t = state.site.theme || {};
+  const r = document.documentElement.style;
+
+  if (t.camellia) {
+    r.setProperty('--camellia', t.camellia);
+    r.setProperty('--camellia-dark', darken(t.camellia, 0.3));
+  }
+  if (t.gold)  r.setProperty('--gold', t.gold);
+  if (t.ink) {
+    r.setProperty('--ink', t.ink);
+    r.setProperty('--ink-soft',  darken(t.ink, -0.45) || t.ink);
+  }
+  if (t.paper) {
+    r.setProperty('--paper', t.paper);
+    r.setProperty('--paper-edge', darken(t.paper, 0.05));
+  }
+  if (t.wood) {
+    /* 壁の色。明るさ違いを4段つくって木目にする */
+    r.setProperty('--wood-2', t.wood);
+    r.setProperty('--wood-1', darken(t.wood, -0.18));
+    r.setProperty('--wood-3', darken(t.wood, 0.18));
+    r.setProperty('--wood-4', darken(t.wood, -0.32));
+  }
+  if (t.radius !== undefined && t.radius !== null) r.setProperty('--radius', t.radius + 'px');
+  if (t.feedW)  r.setProperty('--feed-w', t.feedW + 'px');
+  if (t.font && FONT_STACKS[t.font]) r.setProperty('--font-sans', FONT_STACKS[t.font]);
+
+  /* 影の強さ。0 にすると影が消える */
+  if (t.shadow !== undefined && t.shadow !== null) {
+    const k = Math.max(0, Math.min(200, Number(t.shadow))) / 100;
+    r.setProperty('--shadow-k', String(k));
+    document.body.classList.toggle('no-shadow', k === 0);
+  }
+}
+
+/** 下のナビに出すページを、設定どおりにする */
+function applySections() {
+  const sec = state.site.sections || {};
+  let firstOn = null;
+  document.querySelectorAll('.bottomnav button[data-page]').forEach(b => {
+    const key = b.dataset.page;
+    const conf = sec[key];
+    const on = !conf || conf.on !== false;
+    b.hidden = !on;
+    if (on && !firstOn) firstOn = key;
+    if (conf && conf.label) {
+      const span = b.querySelector('span');
+      if (span) span.textContent = conf.label;
+    }
+  });
+  /* 今いるページが消されていたら、残っている最初のページへ逃がす */
+  if (firstOn && sec[state.page] && sec[state.page].on === false) showPage(firstOn);
+}
+
+/** 管理ページで書いたCSSを、いちばん最後に効かせる */
+function applyCustomCss() {
+  let el = document.getElementById('customCss');
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'customCss';
+    document.head.appendChild(el);
+  }
+  el.textContent = state.site.customCss || '';
+}
+
+/** 3つまとめて */
+function applyLook() {
+  applyTheme();
+  applySections();
+  applyCustomCss();
 }

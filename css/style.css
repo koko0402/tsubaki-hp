@@ -23,6 +23,7 @@
   --topbar:54px;
   --bottomnav:60px;
   --feed-w:620px;
+  --shadow-k:1;              /* 影の強さ。管理ページから変わる。0で影なし */
 
   --font-sans:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",Meiryo,system-ui,sans-serif;
   --font-serif:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Noto Serif JP",serif;
@@ -983,3 +984,20 @@ body.has-bg::before{ opacity:.12; }
 
 .pf-file{ font-size:12.5px; width:100%; }
 #pfZoom{ flex:1; accent-color:var(--camellia); }
+
+
+/* 影を消す（管理ページ → 見た目 → 影の強さ を 0 にしたとき） */
+body.no-shadow .card-frame,
+body.no-shadow .post,
+body.no-shadow .tile,
+body.no-shadow .win,
+body.no-shadow .blog-item,
+body.no-shadow .pf-card,
+body.no-shadow .card-pin{
+  box-shadow:none !important;
+  filter:none !important;
+}
+
+/* hidden 属性は display 指定に負けるので、明示的に消しておく。
+   （管理ページ → 見た目 → 出すページ のチェックを外したときに効く） */
+.bottomnav button[hidden]{ display:none !important; }

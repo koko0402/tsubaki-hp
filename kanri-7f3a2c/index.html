@@ -90,6 +90,8 @@ button.danger{ background:transparent; color:#ff8f9d; border:1px solid rgba(255,
 .empty{ color:var(--sub); font-size:13px; padding:8px 0; }
 
 #preview{ max-width:190px; margin-top:12px; border-radius:8px; display:none; }
+.row4{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:14px; }
+input[type=color]{ width:100%; height:38px; padding:2px; cursor:pointer; }
 code{ background:#100b07; padding:1px 6px; border-radius:4px; font-size:12.5px; color:var(--gold); }
 .bg-preview{
   position:relative; height:190px; border-radius:8px; overflow:hidden;
@@ -166,6 +168,7 @@ a{ color:var(--gold); }
       <button type="button" class="tab on" data-tab="works">絵</button>
       <button type="button" class="tab"    data-tab="blog">ブログ</button>
       <button type="button" class="tab"    data-tab="settings">サイト設定</button>
+      <button type="button" class="tab"    data-tab="look">見た目</button>
       <button type="button" class="tab"    data-tab="comments">コメント</button>
     </div>
 
@@ -343,6 +346,74 @@ a{ color:var(--gold); }
           <button id="bgSave">背景を保存する</button>
           <button id="bgClear" class="danger" type="button">木目に戻す</button>
           <span id="bgMsg" class="msg"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 見た目 ---------- -->
+    <section id="tab-look" class="hidden">
+      <div class="panel">
+        <h2>色</h2>
+        <p class="hint">ここを変えると、サイト全体の色がまとめて変わる。
+          ボタンの押したときの濃い色などは、自動で作られる。</p>
+        <div class="row4">
+          <div><label for="tCamellia">主役の色</label><input type="color" id="tCamellia" value="#c62b3d"></div>
+          <div><label for="tGold">差し色</label><input type="color" id="tGold" value="#e8b84b"></div>
+          <div><label for="tInk">文字</label><input type="color" id="tInk" value="#2b2018"></div>
+          <div><label for="tPaper">カードの紙</label><input type="color" id="tPaper" value="#fdfbf5"></div>
+          <div><label for="tWood">壁の色</label><input type="color" id="tWood" value="#5e3c20"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>形</h2>
+        <div class="row">
+          <div>
+            <label for="tRadius">角の丸み　<span id="tRadiusV">12px</span></label>
+            <input type="range" id="tRadius" min="0" max="34" value="12">
+          </div>
+          <div>
+            <label for="tShadow">影の強さ　<span id="tShadowV">100%</span></label>
+            <input type="range" id="tShadow" min="0" max="200" step="10" value="100">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="tFont">書体</label>
+            <select id="tFont">
+              <option value="sans">ゴシック（標準）</option>
+              <option value="serif">明朝</option>
+              <option value="round">丸ゴシック</option>
+            </select>
+          </div>
+          <div>
+            <label for="tFeedW">フィードの幅　<span id="tFeedWV">620px</span></label>
+            <input type="range" id="tFeedW" min="440" max="860" step="20" value="620">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>下のナビに出すページ</h2>
+        <p class="hint">チェックを外すと、そのページが消える。名前も変えられる。</p>
+        <div id="secRows"></div>
+      </div>
+
+      <div class="panel">
+        <h2>自分でCSSを足す</h2>
+        <p class="hint">ここに書いたものが<b>いちばん最後に効く</b>。
+          上の設定で足りないところを、直接書き換えられる。</p>
+        <textarea id="tCss" rows="8" spellcheck="false"
+          placeholder=".topbar{ letter-spacing:.2em; }&#10;.post{ border:2px solid #000; }"></textarea>
+        <p class="hint">書き方が分からないときは
+          <a href="../../web-lesson/playground/css-gallery.html" target="_blank">CSS見本帳</a> を見る。</p>
+      </div>
+
+      <div class="panel">
+        <div class="actions">
+          <button id="lookSave">見た目を保存する</button>
+          <button id="lookReset" class="ghost" type="button">最初の状態に戻す</button>
+          <span id="lookMsg" class="msg"></span>
         </div>
       </div>
     </section>
@@ -685,6 +756,7 @@ function fillSettings() {
   $('#sArtists').value   = JSON.stringify(settings.artists || {}, null, 2);
   $('#sRequireLogin').checked = !!settings.require_login_to_comment;
   fillBackground();
+  fillLook();
 }
 
 /* ============================================================
@@ -807,6 +879,121 @@ $('#sSave').addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+
+
+/* ============================================================
+   見た目
+   ------------------------------------------------------------
+   色・形・出すページ・自分で足すCSS。
+   サイト側では js/core.js の applyLook() が同じ値を読んで当てている。
+   ============================================================ */
+
+const THEME_DEFAULT = {
+  camellia: '#c62b3d', gold: '#e8b84b', ink: '#2b2018',
+  paper: '#fdfbf5', wood: '#5e3c20',
+  radius: 12, shadow: 100, font: 'sans', feedW: 620,
+};
+
+const SECTION_LIST = [
+  ['home', 'ホーム'],
+  ['wall', 'ギャラリー'],
+  ['blog', 'ブログ'],
+  ['me',   'わたし'],
+];
+
+function fillLook() {
+  const t = Object.assign({}, THEME_DEFAULT, settings.theme || {});
+  $('#tCamellia').value = t.camellia;
+  $('#tGold').value     = t.gold;
+  $('#tInk').value      = t.ink;
+  $('#tPaper').value    = t.paper;
+  $('#tWood').value     = t.wood;
+  $('#tRadius').value   = t.radius;
+  $('#tShadow').value   = t.shadow;
+  $('#tFeedW').value    = t.feedW;
+  $('#tFont').value     = t.font;
+  $('#tRadiusV').textContent = t.radius + 'px';
+  $('#tShadowV').textContent = t.shadow + '%';
+  $('#tFeedWV').textContent  = t.feedW + 'px';
+  $('#tCss').value = settings.custom_css || '';
+
+  const sec = settings.sections || {};
+  $('#secRows').innerHTML = SECTION_LIST.map(([k, label]) => {
+    const c = sec[k] || {};
+    const on = c.on !== false;
+    return '<div class="item">'
+      + '<label class="inline"><input type="checkbox" data-secon="' + k + '"'
+      + (on ? ' checked' : '') + '> 出す</label>'
+      + '<input data-seclabel="' + k + '" value="'
+      + String(c.label || label).replace(/"/g, '&quot;') + '" style="flex:1">'
+      + '</div>';
+  }).join('');
+}
+
+/* スライダーの数字を出す */
+[['tRadius', 'tRadiusV', 'px'], ['tShadow', 'tShadowV', '%'], ['tFeedW', 'tFeedWV', 'px']]
+  .forEach(([id, out, unit]) => {
+    $('#' + id).addEventListener('input', () => {
+      $('#' + out).textContent = $('#' + id).value + unit;
+    });
+  });
+
+function readLook() {
+  const theme = {
+    camellia: $('#tCamellia').value,
+    gold:     $('#tGold').value,
+    ink:      $('#tInk').value,
+    paper:    $('#tPaper').value,
+    wood:     $('#tWood').value,
+    radius:   Number($('#tRadius').value),
+    shadow:   Number($('#tShadow').value),
+    feedW:    Number($('#tFeedW').value),
+    font:     $('#tFont').value,
+  };
+  const sections = {};
+  SECTION_LIST.forEach(([k, label]) => {
+    const on = $('[data-secon="' + k + '"]');
+    const lb = $('[data-seclabel="' + k + '"]');
+    sections[k] = {
+      on: on ? on.checked : true,
+      label: (lb && lb.value.trim()) || label,
+    };
+  });
+  return { theme, sections, custom_css: $('#tCss').value };
+}
+
+$('#lookSave').addEventListener('click', async () => {
+  const btn = $('#lookSave');
+  btn.disabled = true;
+  try {
+    /* ホームまで消すと戻れなくなるので、1つは必ず残す */
+    const v = readLook();
+    if (!Object.values(v.sections).some(s => s.on)) {
+      throw new Error('ページを全部消すことはできない。1つは残して');
+    }
+    await ADMIN.saveSettings(v);
+    settings = await ADMIN.settings();
+    fillLook();
+    say('#lookMsg', '見た目を保存した');
+  } catch (err) {
+    say('#lookMsg', err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('#lookReset').addEventListener('click', async () => {
+  if (!window.confirm('見た目を最初の状態に戻す。いい？')) return;
+  try {
+    await ADMIN.saveSettings({ theme: {}, sections: {}, custom_css: '' });
+    settings = await ADMIN.settings();
+    fillLook();
+    say('#lookMsg', '最初の状態に戻した');
+  } catch (err) {
+    say('#lookMsg', err.message, true);
+  }
+});
+
 
 /* ============================================================
    コメント

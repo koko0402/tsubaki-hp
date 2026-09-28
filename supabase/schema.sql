@@ -53,6 +53,14 @@ alter table public.site_settings
 --   bg_image が空なら、木目の背景のままになります。
 --   bg_mode は 'cover'（全面に伸ばす）か 'tile'（並べて敷き詰める）。
 --   bg_dim は背景を暗くする度合い 0〜0.7。明るい絵で文字が読みにくいときに上げます。
+-- 見た目（色・角丸・影・フォント・幅）／ページの出し分け／自分で足すCSS
+alter table public.site_settings
+  add column if not exists theme      jsonb not null default '{}'::jsonb;
+alter table public.site_settings
+  add column if not exists sections   jsonb not null default '{}'::jsonb;
+alter table public.site_settings
+  add column if not exists custom_css text  not null default '';
+
 alter table public.site_settings
   add column if not exists bg_image text not null default '';
 alter table public.site_settings

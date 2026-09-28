@@ -191,6 +191,7 @@ async function boot() {
     } catch {}
   }
 
+  applyLook();          /* 色・ページの出し分け・自分で足したCSS */
   renderHeader();
   renderArtistFilter();
   renderTagBar();
