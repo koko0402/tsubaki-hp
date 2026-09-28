@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720">
+  <rect width="720" height="720" fill="#faf4ea"/>
+  <g opacity="0.9">
+    <circle cx="260" cy="250" r="150" fill="#e4735f" opacity="0.75"/>
+    <circle cx="440" cy="300" r="130" fill="#4f9ab5" opacity="0.7"/>
+    <circle cx="330" cy="450" r="140" fill="#e8b84b" opacity="0.7"/>
+  </g>
+  <g stroke="#2b2018" stroke-width="3" fill="none" opacity="0.55">
+    <path d="M90 600 C 220 520 300 660 420 580 S 620 520 660 600"/>
+    <path d="M90 640 C 220 560 300 700 420 620 S 620 560 660 640"/>
+  </g>
+  <text x="360" y="695" font-family="serif" font-size="22" fill="#2b2018" opacity="0.3" text-anchor="middle">見本 / sample</text>
+</svg>

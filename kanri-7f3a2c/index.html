@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, noimageindex">
+<title>投稿する ｜ 椿@お絵描き局</title>
+<style>
+:root{
+  --bg:#16110c; --panel:#221a12; --panel2:#1b140e; --line:#3b2e21;
+  --ink:#f0e6d6; --sub:#a89a86; --camellia:#c62b3d; --gold:#e8b84b; --green:#6fa87b;
+}
+*{ box-sizing:border-box; }
+body{
+  margin:0; min-height:100vh; padding:0 20px 90px;
+  background:var(--bg); color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic",Meiryo,system-ui,sans-serif;
+  line-height:1.75; font-size:14px;
+}
+.wrap{ max-width:900px; margin:0 auto; }
+
+.head{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:20px 0 18px; margin-bottom:22px;
+  border-bottom:1px solid var(--line);
+}
+.head-mark{ width:30px; height:30px; }
+.head h1{ margin:0; font-size:17px; letter-spacing:.12em; font-weight:600; }
+.head .who{ font-size:11.5px; color:var(--sub); }
+.head-actions{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+
+h2{ font-size:14px; letter-spacing:.1em; margin:0 0 16px; color:var(--gold); }
+.panel{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:22px; margin-bottom:20px; }
+.hidden{ display:none !important; }
+
+label{ display:block; font-size:11.5px; letter-spacing:.08em; color:#bfae96; margin:14px 0 5px; }
+label.inline{ display:flex; align-items:flex-start; gap:8px; margin-top:16px; font-size:13px; color:var(--ink); }
+label.inline input{ margin-top:5px; }
+input,select,textarea{
+  width:100%; font:inherit; font-size:14px; padding:9px 12px;
+  color:var(--ink); background:#100b07; border:1px solid var(--line); border-radius:8px;
+}
+input[type=checkbox]{ width:auto; }
+input[type=file]{ padding:8px; font-size:13px; }
+input:focus,select:focus,textarea:focus{ outline:2px solid rgba(232,184,75,.4); outline-offset:1px; }
+input:disabled,textarea:disabled{ opacity:.55; }
+textarea{ resize:vertical; }
+.row{ display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+.row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 16px; }
+@media (max-width:640px){ .row,.row3{ grid-template-columns:1fr; } }
+
+button{
+  font:inherit; font-size:13.5px; font-weight:700;
+  padding:9px 22px; color:#fff; background:var(--camellia);
+  border:0; border-radius:999px; cursor:pointer;
+}
+button:hover:not(:disabled){ filter:brightness(1.12); }
+button:disabled{ opacity:.5; cursor:default; }
+button.ghost{ background:transparent; color:var(--gold); border:1px solid var(--gold); }
+button.small{ padding:5px 14px; font-size:12px; }
+button.danger{ background:transparent; color:#ff8f9d; border:1px solid rgba(255,143,157,.5); }
+.actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; align-items:center; }
+
+.tabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
+.tab{ background:transparent; color:var(--sub); border:1px solid var(--line); padding:8px 20px; }
+.tab.on{ background:var(--gold); color:#241a0d; border-color:var(--gold); }
+
+.msg{ font-size:12.5px; margin-left:auto; }
+.msg.ok{ color:var(--green); }
+.msg.ng{ color:#ff8f9d; }
+
+.note{ margin:0 0 22px; padding:13px 16px; border-radius:10px; font-size:12.5px; }
+.note.warn{ background:rgba(198,43,61,.12); border:1px solid rgba(198,43,61,.45); }
+.note.info{ background:rgba(232,184,75,.1);  border:1px solid rgba(232,184,75,.4); }
+.note b{ color:var(--gold); }
+.hint{ font-size:11.5px; color:var(--sub); margin:6px 0 0; }
+
+.list{ display:grid; gap:10px; }
+.item{
+  display:flex; gap:14px; align-items:center;
+  padding:10px 12px; background:var(--panel2);
+  border:1px solid var(--line); border-radius:10px;
+}
+.item img{ width:64px; height:64px; object-fit:cover; border-radius:6px; background:#000; flex:0 0 auto; }
+.item .meta{ flex:1; min-width:0; }
+.item .t{ font-weight:700; font-size:14px; }
+.item .d{ font-size:11.5px; color:var(--sub); }
+.item .d .badge{ color:var(--gold); }
+.item .btns{ display:flex; gap:6px; flex-wrap:wrap; flex:0 0 auto; }
+.empty{ color:var(--sub); font-size:13px; padding:8px 0; }
+
+#preview{ max-width:190px; margin-top:12px; border-radius:8px; display:none; }
+code{ background:#100b07; padding:1px 6px; border-radius:4px; font-size:12.5px; color:var(--gold); }
+.bg-preview{
+  position:relative; height:190px; border-radius:8px; overflow:hidden;
+  border:1px solid var(--line); background:#3f2a16;
+  background-image:repeating-linear-gradient(180deg,#7a4f2b 0 44px,#5e3c20 44px 88px);
+  background-size:auto; background-position:center; display:grid; place-items:center;
+}
+.bg-preview.has-img{ background-repeat:no-repeat; background-size:cover; }
+.bg-preview.tile{ background-repeat:repeat; background-size:150px auto; }
+.bg-preview::after{ content:""; position:absolute; inset:0; background:rgba(12,7,3,var(--pv-dim,.25)); }
+.bg-preview span{
+  position:relative; z-index:1; font-size:13px; color:#f3e6cf;
+  text-shadow:0 1px 4px rgba(0,0,0,.8); background:rgba(0,0,0,.35);
+  padding:4px 12px; border-radius:999px;
+}
+a{ color:var(--gold); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="head">
+    <svg class="head-mark" viewBox="0 0 100 100" aria-hidden="true">
+      <g transform="translate(50 50)">
+        <g fill="#8d1526">
+          <ellipse rx="24" ry="30" cy="-17" transform="rotate(36)"/><ellipse rx="24" ry="30" cy="-17" transform="rotate(108)"/>
+          <ellipse rx="24" ry="30" cy="-17" transform="rotate(180)"/><ellipse rx="24" ry="30" cy="-17" transform="rotate(252)"/>
+          <ellipse rx="24" ry="30" cy="-17" transform="rotate(324)"/>
+        </g>
+        <g fill="#c62b3d">
+          <ellipse rx="20" ry="26" cy="-14"/><ellipse rx="20" ry="26" cy="-14" transform="rotate(72)"/>
+          <ellipse rx="20" ry="26" cy="-14" transform="rotate(144)"/><ellipse rx="20" ry="26" cy="-14" transform="rotate(216)"/>
+          <ellipse rx="20" ry="26" cy="-14" transform="rotate(288)"/>
+        </g>
+        <circle r="10" fill="#e8b84b"/>
+      </g>
+    </svg>
+    <div>
+      <h1>投稿する</h1>
+      <div class="who" id="whoami">読み込み中…</div>
+    </div>
+    <div class="head-actions" id="headActions"></div>
+  </header>
+
+  <!-- ===== ログイン（Supabaseを設定しているときだけ） ===== -->
+  <section id="gate" class="panel hidden">
+    <h2>ログイン</h2>
+    <div class="note info">
+      合言葉の確認は <b>サーバー側</b> で行われます。このページのソースを読んでも合言葉は分かりません。
+      投稿できるのは、Supabase の <code>admins</code> に登録されている人だけです。
+    </div>
+    <label for="email">メールアドレス</label>
+    <input id="email" type="email" autocomplete="username" placeholder="you@example.com">
+    <label for="pass">合言葉（パスワード）</label>
+    <input id="pass" type="password" autocomplete="current-password" placeholder="••••••••">
+    <div class="actions">
+      <button id="signin">ログイン</button>
+      <span id="gateMsg" class="msg"></span>
+    </div>
+  </section>
+
+  <!-- ===== 中身 ===== -->
+  <main id="tools" class="hidden">
+
+    <div class="note info hidden" id="demoNote">
+      <b>見本モードで動いています。</b>
+      投稿した絵はこの端末のブラウザの中だけに保存され、他の人には見えません。
+      使い勝手を試すためのものです。実際に公開するには
+      <a href="../SETUP.md">SETUP.md</a> の手順で Supabase をつないでください。
+      つないだあとは、同じ画面がそのまま本番用になります。
+    </div>
+
+    <div class="tabs">
+      <button type="button" class="tab on" data-tab="works">絵</button>
+      <button type="button" class="tab"    data-tab="blog">ブログ</button>
+      <button type="button" class="tab"    data-tab="settings">サイト設定</button>
+      <button type="button" class="tab"    data-tab="comments">コメント</button>
+    </div>
+
+    <!-- ---------- 絵 ---------- -->
+    <section id="tab-works">
+      <div class="panel">
+        <h2 id="workFormTitle">絵を追加する</h2>
+
+        <label for="wFile">画像ファイル</label>
+        <input id="wFile" type="file" accept="image/*">
+        <img id="preview" alt="">
+
+        <label for="wTitle">タイトル</label>
+        <input id="wTitle" placeholder="例：夕暮れの帰り道">
+
+        <div class="row3">
+          <div>
+            <label for="wArtist">描いた人</label>
+            <select id="wArtist"></select>
+          </div>
+          <div>
+            <label for="wDate">日付</label>
+            <input id="wDate" type="date">
+          </div>
+          <div>
+            <label for="wId">id（自動）</label>
+            <input id="wId">
+          </div>
+        </div>
+
+        <label for="wTags">タグ（カンマ区切り）</label>
+        <input id="wTags" placeholder="風景, 夕焼け">
+
+        <label for="wDesc">ひとこと</label>
+        <textarea id="wDesc" rows="3" placeholder="この絵について"></textarea>
+
+        <label class="inline"><input type="checkbox" id="wPickup"> おすすめに入れる（ホームのいちばん上に出ます）</label>
+
+        <div class="actions">
+          <button id="wSave">保存する</button>
+          <button type="button" class="ghost" id="wCancel">やめる</button>
+          <span id="wMsg" class="msg"></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>投稿済みの絵</h2>
+        <div class="list" id="workList"><p class="empty">読み込み中…</p></div>
+      </div>
+    </section>
+
+    <!-- ---------- ブログ ---------- -->
+    <section id="tab-blog" class="hidden">
+      <div class="panel">
+        <h2 id="postFormTitle">記事を書く</h2>
+        <div class="row">
+          <div>
+            <label for="pDate">日付</label>
+            <input id="pDate" type="date">
+          </div>
+          <div>
+            <label for="pTitle">タイトル</label>
+            <input id="pTitle" placeholder="例：サイトつくってます">
+          </div>
+        </div>
+        <label for="pBody">本文（改行はそのまま出ます）</label>
+        <textarea id="pBody" rows="9"></textarea>
+        <label class="inline"><input type="checkbox" id="pPin"> 一番上に固定する（お知らせ扱い）</label>
+        <div class="actions">
+          <button id="pSave">保存する</button>
+          <button type="button" class="ghost" id="pCancel">やめる</button>
+          <span id="pMsg" class="msg"></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>書いた記事</h2>
+        <div class="list" id="postList"><p class="empty">読み込み中…</p></div>
+      </div>
+    </section>
+
+    <!-- ---------- サイト設定 ---------- -->
+    <section id="tab-settings" class="hidden">
+      <div class="panel">
+        <h2>サイト設定</h2>
+        <div class="row">
+          <div>
+            <label for="sTitle">サイト名</label>
+            <input id="sTitle">
+          </div>
+          <div>
+            <label for="sTagline">ひとこと（サイト名の下）</label>
+            <input id="sTagline">
+          </div>
+        </div>
+
+        <label for="sPickupMsg">おすすめ欄の文章</label>
+        <input id="sPickupMsg">
+
+        <div class="row">
+          <div>
+            <label for="sYtId">おすすめのYouTube動画ID（空なら出ません）</label>
+            <input id="sYtId" placeholder="watch?v= のあとの部分">
+          </div>
+          <div>
+            <label for="sYtTitle">動画の見出し</label>
+            <input id="sYtTitle">
+          </div>
+        </div>
+
+        <label for="sLinks">外部リンク（JSON）</label>
+        <textarea id="sLinks" rows="7" spellcheck="false"></textarea>
+
+        <label for="sArtists">描いた人の一覧（JSON）</label>
+        <textarea id="sArtists" rows="6" spellcheck="false"></textarea>
+        <p class="hint">
+          icon に使えるもの: <code>camellia</code> <code>star</code> <code>moon</code> <code>cat</code>
+          <code>leaf</code> <code>drop</code> <code>note</code> <code>heart</code>
+        </p>
+
+        <label class="inline"><input type="checkbox" id="sRequireLogin">
+          コメントに Google ログインを必須にする</label>
+        <p class="hint" id="sRequireHint">
+          オフのとき: なまえ＋アイコンを作れば誰でもコメントできます（画面側のお願いベース）。<br>
+          オンのとき: ログインしていない書き込みを<b>サーバー側で弾きます</b>。荒らされたらこちらへ。
+        </p>
+
+        <div class="actions">
+          <button id="sSave">保存する</button>
+          <span id="sMsg" class="msg"></span>
+        </div>
+      </div>
+
+      <!-- ---------- 背景 ---------- -->
+      <div class="panel">
+        <h2>背景の絵</h2>
+        <p class="hint">
+          描いた背景に差し替えられます。<b>何も入れなければ木目のまま</b>です。
+          横長で大きめ（1600px 以上）の絵がきれいに出ます。
+        </p>
+
+        <div class="row">
+          <div>
+            <label for="bgFile">画像を選ぶ</label>
+            <input type="file" id="bgFile" accept="image/*">
+          </div>
+          <div>
+            <label for="bgUrl">または、ファイルの場所を直接書く</label>
+            <input id="bgUrl" placeholder="images/haikei.png">
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="bgMode">敷き方</label>
+            <select id="bgMode">
+              <option value="cover">全面に伸ばす（写真・一枚絵むき）</option>
+              <option value="tile">並べて敷き詰める（模様むき）</option>
+            </select>
+          </div>
+          <div>
+            <label for="bgDim">暗くする度合い　<span id="bgDimVal">25%</span></label>
+            <input type="range" id="bgDim" min="0" max="70" step="5" value="25">
+          </div>
+        </div>
+        <p class="hint">
+          明るい絵だと文字が読みにくくなります。<b>読みにくいと感じたら暗くする度合いを上げてください。</b>
+          下の見本で確かめられます。
+        </p>
+
+        <label>今の背景</label>
+        <div id="bgPreview" class="bg-preview"><span>木目（背景なし）</span></div>
+
+        <div class="actions">
+          <button id="bgSave">背景を保存する</button>
+          <button id="bgClear" class="danger" type="button">木目に戻す</button>
+          <span id="bgMsg" class="msg"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- コメント ---------- -->
+    <section id="tab-comments" class="hidden">
+      <div class="panel">
+        <h2>最近のコメント（新しい順に100件）</h2>
+        <div class="list" id="commentList"><p class="empty">読み込み中…</p></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../config.js"></script>
+<script src="../js/data.js"></script>
+<script src="../js/demo.js"></script>
+<script src="../js/db.js"></script>
+<script>
+'use strict';
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayISO = () => { const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; };
+
+function say(sel, text, bad) {
+  const el = $(sel);
+  el.textContent = text;
+  el.className = 'msg ' + (text ? (bad ? 'ng' : 'ok') : '');
+  if (text && !bad) setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 4000);
+}
+
+/* 見本モードか、Supabaseにつながっているか */
+const isDemo = !DB.configured;
+const ADMIN  = isDemo ? Demo.admin : DB.admin;
+
+let settings = null;
+let editingWork = null;
+let editingPost = null;
+
+/* ============================================================
+   起動
+   ============================================================ */
+(async function start() {
+  if (isDemo) {
+    await Demo.init();
+    $('#demoNote').classList.remove('hidden');
+    return enter({ display_name: '見本モード', email: 'この端末の中だけ', artist_key: 'tsubaki' });
+  }
+
+  DB.init();
+  const me = await DB.auth.me().catch(() => null);
+  if (me) return enter(me);
+
+  $('#whoami').textContent = 'ログインしてください';
+  $('#gate').classList.remove('hidden');
+})();
+
+$('#signin').addEventListener('click', signIn);
+$('#pass').addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
+
+async function signIn() {
+  const btn = $('#signin');
+  btn.disabled = true;
+  say('#gateMsg', '');
+  try {
+    await DB.auth.signIn($('#email').value.trim(), $('#pass').value);
+    const me = await DB.auth.me();
+    if (!me) {
+      await DB.auth.signOut();
+      throw new Error('このアカウントには投稿の権限がありません（admins に未登録）');
+    }
+    $('#gate').classList.add('hidden');
+    enter(me);
+  } catch (err) {
+    say('#gateMsg', err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function enter(me) {
+  $('#tools').classList.remove('hidden');
+  $('#whoami').textContent = isDemo
+    ? '見本モードで編集中（この端末の中だけ）'
+    : `${me.display_name}（${me.email}）としてログイン中`;
+
+  $('#headActions').innerHTML =
+    `<a href="../index.html" target="_blank"><button type="button" class="ghost small">サイトを見る</button></a>` +
+    (isDemo
+      ? `<button type="button" class="danger small" id="resetDemo">見本データに戻す</button>`
+      : `<button type="button" class="ghost small" id="signout">ログアウト</button>`);
+
+  if (isDemo) {
+    $('#resetDemo').addEventListener('click', async () => {
+      if (!confirm('この端末に保存した投稿をすべて消して、最初の見本データに戻します。よろしいですか？')) return;
+      await Demo.admin.reset();
+      location.reload();
+    });
+    /* 見本モードにはサーバーが無いので、この設定は効かない */
+    $('#sRequireLogin').disabled = true;
+    $('#sRequireHint').innerHTML =
+      'この設定はサーバー（Supabase）をつないでから使えます。見本モードでは効きません。';
+  } else {
+    $('#signout').addEventListener('click', async () => {
+      await DB.auth.signOut();
+      location.reload();
+    });
+  }
+
+  $('#wDate').value = todayISO();
+  $('#pDate').value = todayISO();
+  $('#wId').value   = newWorkId();
+
+  settings = await ADMIN.settings();
+  fillSettings();
+  fillArtistOptions(me.artist_key);
+
+  await Promise.all([loadWorks(), loadPosts(), loadComments()]);
+}
+
+/* タブ切り替え */
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
+  ['works','blog','settings','comments'].forEach(name =>
+    $('#tab-' + name).classList.toggle('hidden', name !== t.dataset.tab));
+}));
+
+/* ============================================================
+   絵
+   ============================================================ */
+function newWorkId() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  const r = Math.random().toString(36).slice(2, 6);
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${r}`;
+}
+
+function fillArtistOptions(preferred) {
+  const artists = settings?.artists || {};
+  $('#wArtist').innerHTML = Object.entries(artists)
+    .map(([k, v]) => `<option value="${esc(k)}"${k === preferred ? ' selected' : ''}>${esc(v.name || k)}</option>`)
+    .join('') || '<option value="tsubaki">椿</option>';
+}
+
+$('#wFile').addEventListener('change', e => {
+  const f = e.target.files?.[0];
+  const img = $('#preview');
+  if (!f) { img.style.display = 'none'; return; }
+  img.src = URL.createObjectURL(f);
+  img.style.display = 'block';
+});
+
+$('#wSave').addEventListener('click', async () => {
+  const btn = $('#wSave');
+  const file = $('#wFile').files?.[0];
+  const title = $('#wTitle').value.trim();
+
+  if (!title)                return say('#wMsg', 'タイトルを入れてください', true);
+  if (!file && !editingWork) return say('#wMsg', '画像を選んでください', true);
+
+  btn.disabled = true;
+  say('#wMsg', '保存中…');
+  try {
+    const imagePath = file ? await ADMIN.uploadImage(file) : editingWork.imagePath;
+    await ADMIN.saveWork({
+      id:        $('#wId').value.trim() || newWorkId(),
+      title,
+      imagePath,
+      artist:    $('#wArtist').value,
+      date:      $('#wDate').value || todayISO(),
+      desc:      $('#wDesc').value.trim(),
+      tags:      $('#wTags').value.split(',').map(s => s.trim()).filter(Boolean),
+      isPickup:  $('#wPickup').checked,
+      pickupOrder: $('#wPickup').checked ? 1 : null,
+    });
+    resetWorkForm();
+    say('#wMsg', '保存しました');
+    await loadWorks();
+  } catch (err) {
+    say('#wMsg', err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('#wCancel').addEventListener('click', resetWorkForm);
+
+function resetWorkForm() {
+  editingWork = null;
+  $('#workFormTitle').textContent = '絵を追加する';
+  $('#wFile').value = ''; $('#preview').style.display = 'none';
+  $('#wTitle').value = ''; $('#wDesc').value = ''; $('#wTags').value = '';
+  $('#wPickup').checked = false;
+  $('#wDate').value = todayISO();
+  $('#wId').value = newWorkId();
+}
+
+async function loadWorks() {
+  const box = $('#workList');
+  try {
+    const works = await ADMIN.listWorks();
+    box.innerHTML = works.length ? works.map(w => `
+      <div class="item">
+        <img src="${esc(w.file)}" alt="">
+        <div class="meta">
+          <div class="t">${esc(w.title)}</div>
+          <div class="d">${esc(w.date)} ／ ${esc(settings?.artists?.[w.artist]?.name || w.artist)}
+            ${w.isPickup ? '<span class="badge">★おすすめ</span>' : ''}</div>
+        </div>
+        <div class="btns">
+          <button type="button" class="ghost small" data-edit="${esc(w.id)}">編集</button>
+          <button type="button" class="ghost small" data-pick="${esc(w.id)}">${w.isPickup ? 'おすすめ解除' : 'おすすめ'}</button>
+          <button type="button" class="danger small" data-del="${esc(w.id)}">削除</button>
+        </div>
+      </div>`).join('') : '<p class="empty">まだありません。</p>';
+
+    box.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => {
+      const w = works.find(x => x.id === b.dataset.edit);
+      editingWork = w;
+      $('#workFormTitle').textContent = `「${w.title}」を編集`;
+      $('#wId').value = w.id;
+      $('#wTitle').value = w.title;
+      $('#wArtist').value = w.artist;
+      $('#wDate').value = w.date;
+      $('#wDesc').value = w.desc;
+      $('#wTags').value = (w.tags || []).join(', ');
+      $('#wPickup').checked = !!w.isPickup;
+      $('#wFile').value = '';
+      $('#preview').src = w.file; $('#preview').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }));
+
+    box.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', async () => {
+      const w = works.find(x => x.id === b.dataset.pick);
+      b.disabled = true;
+      try { await ADMIN.setPickup(w.id, !w.isPickup, 1); await loadWorks(); }
+      catch (err) { say('#wMsg', err.message, true); b.disabled = false; }
+    }));
+
+    box.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+      const w = works.find(x => x.id === b.dataset.del);
+      if (!confirm(`「${w.title}」を削除します。元に戻せません。よろしいですか？`)) return;
+      b.disabled = true;
+      try { await ADMIN.deleteWork(w.id, w.imagePath); await loadWorks(); say('#wMsg', '削除しました'); }
+      catch (err) { say('#wMsg', err.message, true); b.disabled = false; }
+    }));
+  } catch (err) {
+    box.innerHTML = `<p class="empty">読み込めませんでした：${esc(err.message)}</p>`;
+  }
+}
+
+/* ============================================================
+   ブログ
+   ============================================================ */
+$('#pSave').addEventListener('click', async () => {
+  const title = $('#pTitle').value.trim();
+  const body  = $('#pBody').value.trim();
+  if (!title || !body) return say('#pMsg', 'タイトルと本文を入れてください', true);
+
+  const btn = $('#pSave');
+  btn.disabled = true;
+  try {
+    await ADMIN.savePost({
+      id: editingPost?.id,
+      date: $('#pDate').value || todayISO(),
+      title, body,
+      pinned: $('#pPin').checked,
+    });
+    resetPostForm();
+    say('#pMsg', '保存しました');
+    await loadPosts();
+  } catch (err) {
+    say('#pMsg', err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('#pCancel').addEventListener('click', resetPostForm);
+
+function resetPostForm() {
+  editingPost = null;
+  $('#postFormTitle').textContent = '記事を書く';
+  $('#pTitle').value = ''; $('#pBody').value = '';
+  $('#pPin').checked = false;
+  $('#pDate').value = todayISO();
+}
+
+async function loadPosts() {
+  const box = $('#postList');
+  try {
+    const posts = await ADMIN.listPosts();
+    box.innerHTML = posts.length ? posts.map(p => `
+      <div class="item">
+        <div class="meta">
+          <div class="t">${esc(p.title)} ${p.pinned ? '<span class="d badge">（固定）</span>' : ''}</div>
+          <div class="d">${esc(p.date)}</div>
+        </div>
+        <div class="btns">
+          <button type="button" class="ghost small" data-pedit="${esc(p.id)}">編集</button>
+          <button type="button" class="danger small" data-pdel="${esc(p.id)}">削除</button>
+        </div>
+      </div>`).join('') : '<p class="empty">まだありません。</p>';
+
+    box.querySelectorAll('[data-pedit]').forEach(b => b.addEventListener('click', () => {
+      const p = posts.find(x => String(x.id) === b.dataset.pedit);
+      editingPost = p;
+      $('#postFormTitle').textContent = `「${p.title}」を編集`;
+      $('#pDate').value = p.date; $('#pTitle').value = p.title;
+      $('#pBody').value = p.body; $('#pPin').checked = !!p.pinned;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }));
+
+    box.querySelectorAll('[data-pdel]').forEach(b => b.addEventListener('click', async () => {
+      const p = posts.find(x => String(x.id) === b.dataset.pdel);
+      if (!confirm(`「${p.title}」を削除します。よろしいですか？`)) return;
+      b.disabled = true;
+      try { await ADMIN.deletePost(p.id); await loadPosts(); say('#pMsg', '削除しました'); }
+      catch (err) { say('#pMsg', err.message, true); b.disabled = false; }
+    }));
+  } catch (err) {
+    box.innerHTML = `<p class="empty">読み込めませんでした：${esc(err.message)}</p>`;
+  }
+}
+
+/* ============================================================
+   サイト設定
+   ============================================================ */
+function fillSettings() {
+  if (!settings) return;
+  $('#sTitle').value     = settings.title || '';
+  $('#sTagline').value   = settings.tagline || '';
+  $('#sPickupMsg').value = settings.pickup_message || '';
+  $('#sYtId').value      = settings.youtube_id || '';
+  $('#sYtTitle').value   = settings.youtube_title || '';
+  $('#sLinks').value     = JSON.stringify(settings.links || [], null, 2);
+  $('#sArtists').value   = JSON.stringify(settings.artists || {}, null, 2);
+  $('#sRequireLogin').checked = !!settings.require_login_to_comment;
+  fillBackground();
+}
+
+/* ============================================================
+   背景の絵
+   ============================================================ */
+let bgObjectUrl = null;          /* 選んだファイルの一時URL。使い終わったら捨てる */
+
+function bgPreviewPaint(url, mode, dim) {
+  const pv = $('#bgPreview');
+  pv.style.setProperty('--pv-dim', String(dim));
+  pv.classList.toggle('tile', mode === 'tile');
+  if (url) {
+    pv.classList.add('has-img');
+    pv.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`;
+    pv.querySelector('span').textContent = mode === 'tile' ? '並べて敷き詰める' : '全面に伸ばす';
+  } else {
+    pv.classList.remove('has-img');
+    pv.style.backgroundImage = '';
+    pv.querySelector('span').textContent = '木目（背景なし）';
+  }
+}
+
+function fillBackground() {
+  const url  = settings.bg_image || '';
+  const mode = settings.bg_mode  || 'cover';
+  const dim  = settings.bg_dim ?? 0.25;
+
+  $('#bgUrl').value   = url;
+  $('#bgMode').value  = mode;
+  $('#bgDim').value   = String(Math.round(dim * 100));
+  $('#bgDimVal').textContent = Math.round(dim * 100) + '%';
+  bgPreviewPaint(url, mode, dim);
+}
+
+/* 選んだ絵をその場で見せる（まだ保存はしない） */
+$('#bgFile').addEventListener('change', () => {
+  const f = $('#bgFile').files[0];
+  if (bgObjectUrl) { URL.revokeObjectURL(bgObjectUrl); bgObjectUrl = null; }
+  if (!f) return fillBackground();
+  bgObjectUrl = URL.createObjectURL(f);
+  $('#bgUrl').value = '';
+  bgPreviewPaint(bgObjectUrl, $('#bgMode').value, Number($('#bgDim').value) / 100);
+});
+
+$('#bgUrl').addEventListener('input', () => {
+  if ($('#bgUrl').value.trim()) {
+    $('#bgFile').value = '';
+    if (bgObjectUrl) { URL.revokeObjectURL(bgObjectUrl); bgObjectUrl = null; }
+  }
+  bgPreviewPaint($('#bgUrl').value.trim() || bgObjectUrl, $('#bgMode').value, Number($('#bgDim').value) / 100);
+});
+
+$('#bgMode').addEventListener('change', () => {
+  bgPreviewPaint($('#bgUrl').value.trim() || bgObjectUrl, $('#bgMode').value, Number($('#bgDim').value) / 100);
+});
+
+$('#bgDim').addEventListener('input', () => {
+  const d = Number($('#bgDim').value) / 100;
+  $('#bgDimVal').textContent = $('#bgDim').value + '%';
+  bgPreviewPaint($('#bgUrl').value.trim() || bgObjectUrl, $('#bgMode').value, d);
+});
+
+$('#bgSave').addEventListener('click', async () => {
+  const btn = $('#bgSave');
+  btn.disabled = true;
+  try {
+    const file = $('#bgFile').files[0];
+    let url = $('#bgUrl').value.trim();
+    if (file) url = await ADMIN.uploadImage(file);
+
+    await ADMIN.saveSettings({
+      bg_image: url,
+      bg_mode:  $('#bgMode').value,
+      bg_dim:   Number($('#bgDim').value) / 100,
+    });
+    settings = await ADMIN.settings();
+    $('#bgFile').value = '';
+    if (bgObjectUrl) { URL.revokeObjectURL(bgObjectUrl); bgObjectUrl = null; }
+    fillBackground();
+    say('#bgMsg', url ? '背景を変えました' : '木目に戻しました');
+  } catch (err) {
+    say('#bgMsg', err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('#bgClear').addEventListener('click', async () => {
+  $('#bgFile').value = '';
+  $('#bgUrl').value = '';
+  if (bgObjectUrl) { URL.revokeObjectURL(bgObjectUrl); bgObjectUrl = null; }
+  $('#bgSave').click();
+});
+
+$('#sSave').addEventListener('click', async () => {
+  const btn = $('#sSave');
+  let links, artists;
+  try { links = JSON.parse($('#sLinks').value || '[]'); }
+  catch { return say('#sMsg', '外部リンクのJSONが壊れています', true); }
+  try { artists = JSON.parse($('#sArtists').value || '{}'); }
+  catch { return say('#sMsg', '描いた人のJSONが壊れています', true); }
+
+  btn.disabled = true;
+  try {
+    await ADMIN.saveSettings({
+      title: $('#sTitle').value.trim(),
+      tagline: $('#sTagline').value.trim(),
+      pickup_message: $('#sPickupMsg').value.trim(),
+      youtube_id: $('#sYtId').value.trim(),
+      youtube_title: $('#sYtTitle').value.trim(),
+      require_login_to_comment: $('#sRequireLogin').checked,
+      links, artists,
+    });
+    settings = await ADMIN.settings();
+    fillArtistOptions($('#wArtist').value);
+    say('#sMsg', '保存しました');
+  } catch (err) {
+    say('#sMsg', err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ============================================================
+   コメント
+   ============================================================ */
+async function loadComments() {
+  const box = $('#commentList');
+  try {
+    const rows = await ADMIN.listComments();
+    box.innerHTML = rows.length ? rows.map(c => `
+      <div class="item">
+        <div class="meta">
+          <div class="t">${esc(c.name)}<span class="d"> ／ ${esc(String(c.created_at).slice(0,10))} ／ ${esc(c.work_id)}</span></div>
+          <div class="d" style="white-space:pre-wrap;color:var(--ink)">${esc(c.body)}</div>
+        </div>
+        <div class="btns"><button type="button" class="danger small" data-cdel="${esc(c.id)}">削除</button></div>
+      </div>`).join('') : '<p class="empty">まだありません。</p>';
+
+    box.querySelectorAll('[data-cdel]').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('このコメントを削除します。よろしいですか？')) return;
+      b.disabled = true;
+      try { await ADMIN.deleteComment(b.dataset.cdel); await loadComments(); }
+      catch (err) { alert(err.message); b.disabled = false; }
+    }));
+  } catch (err) {
+    box.innerHTML = `<p class="empty">読み込めませんでした：${esc(err.message)}</p>`;
+  }
+}
+</script>
+</body>
+</html>

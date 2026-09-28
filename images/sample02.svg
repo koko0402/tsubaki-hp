@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600">
+  <defs>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d9efff"/>
+      <stop offset="55%" stop-color="#5aa9d6"/>
+      <stop offset="100%" stop-color="#12496e"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="600" fill="url(#g2)"/>
+  <path d="M0 340 C150 300 260 400 420 350 C560 306 700 380 900 330 L900 600 L0 600 Z" fill="#2f7fae" opacity="0.85"/>
+  <path d="M0 420 C170 388 300 470 470 430 C630 392 760 460 900 420 L900 600 L0 600 Z" fill="#1c5f8a"/>
+  <path d="M0 500 C200 470 320 540 520 505 C690 476 780 530 900 500 L900 600 L0 600 Z" fill="#0f4368"/>
+  <circle cx="740" cy="120" r="46" fill="#fff8e1" opacity="0.85"/>
+  <text x="450" y="575" font-family="serif" font-size="22" fill="#ffffff" opacity="0.35" text-anchor="middle">見本 / sample</text>
+</svg>

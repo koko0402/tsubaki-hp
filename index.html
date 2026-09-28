@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>椿@お絵描き局</title>
+<meta name="description" content="椿の絵を展示している場所です。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ===== 差し替え用の背景（設定されたときだけ出る） ===== -->
+<div class="site-bg" id="siteBg" hidden aria-hidden="true"></div>
+
+<!-- ===== SVG部品（画面には出ない） ===== -->
+<svg class="svg-sprite" aria-hidden="true">
+  <symbol id="pin-camellia" viewBox="0 0 100 100">
+    <g class="pin-shadow"><ellipse cx="52" cy="60" rx="26" ry="10"/></g>
+    <g transform="translate(50 50)">
+      <g class="pin-petal-back">
+        <ellipse rx="24" ry="30" cy="-17" transform="rotate(36)"/>
+        <ellipse rx="24" ry="30" cy="-17" transform="rotate(108)"/>
+        <ellipse rx="24" ry="30" cy="-17" transform="rotate(180)"/>
+        <ellipse rx="24" ry="30" cy="-17" transform="rotate(252)"/>
+        <ellipse rx="24" ry="30" cy="-17" transform="rotate(324)"/>
+      </g>
+      <g class="pin-petal-front">
+        <ellipse rx="20" ry="26" cy="-14" transform="rotate(0)"/>
+        <ellipse rx="20" ry="26" cy="-14" transform="rotate(72)"/>
+        <ellipse rx="20" ry="26" cy="-14" transform="rotate(144)"/>
+        <ellipse rx="20" ry="26" cy="-14" transform="rotate(216)"/>
+        <ellipse rx="20" ry="26" cy="-14" transform="rotate(288)"/>
+      </g>
+      <circle class="pin-core" r="10"/>
+      <g class="pin-stamen">
+        <circle cx="-4" cy="-3" r="2.2"/><circle cx="4" cy="-4" r="2.2"/>
+        <circle cx="0" cy="4" r="2.2"/><circle cx="-5" cy="4" r="1.8"/><circle cx="5" cy="3" r="1.8"/>
+      </g>
+      <circle class="pin-gloss" cx="-5" cy="-8" r="3.5"/>
+    </g>
+  </symbol>
+
+  <symbol id="ic-home" viewBox="0 0 24 24"><path d="M12 3 2.5 11.2l1.3 1.5L5 11.7V21h5v-6h4v6h5v-9.3l1.2 1 1.3-1.5Z"/></symbol>
+  <symbol id="ic-grid" viewBox="0 0 24 24"><path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z"/></symbol>
+  <symbol id="ic-wall" viewBox="0 0 24 24"><path d="M3 4h18v3H3zm0 5h8v6H3zm10 0h8v6h-8zM3 17h18v3H3z"/></symbol>
+  <symbol id="ic-blog" viewBox="0 0 24 24"><path d="M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm2 4v2h10V7Zm0 4v2h10v-2Zm0 4v2h6v-2Z"/></symbol>
+  <symbol id="ic-me" viewBox="0 0 24 24"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.4 0-8 2.4-8 5.3V21h16v-1.7c0-2.9-3.6-5.3-8-5.3Z"/></symbol>
+  <symbol id="ic-heart" viewBox="0 0 24 24"><path d="M12 20.8 4 13a4.9 4.9 0 0 1 7-6.9l1 1 1-1a4.9 4.9 0 0 1 7 6.9z"/></symbol>
+  <symbol id="ic-heart-o" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 20.8 4 13a4.9 4.9 0 0 1 7-6.9l1 1 1-1a4.9 4.9 0 0 1 7 6.9zM12 18l6.6-6.4a2.9 2.9 0 0 0-4.1-4.1L12 9.9 9.5 7.5a2.9 2.9 0 0 0-4.1 4.1z"/></symbol>
+  <symbol id="ic-comment" viewBox="0 0 24 24"><path d="M12 3c5.5 0 10 3.4 10 7.6s-4.5 7.6-10 7.6c-.9 0-1.8-.1-2.6-.3L4 21l1.2-3.6C3.2 16 2 13.4 2 10.6 2 6.4 6.5 3 12 3Z"/></symbol>
+  <symbol id="ic-share" viewBox="0 0 24 24"><path d="M18 16.1a3 3 0 0 0-2 .8l-7.1-4.1a3 3 0 0 0 0-1.6L16 7.1a3 3 0 1 0-1-2.1l-7.1 4.1a3 3 0 1 0 0 5.8L15 19a3 3 0 1 0 3-2.9Z"/></symbol>
+</svg>
+
+<!-- ===== 上のバー ===== -->
+<header class="topbar">
+  <button type="button" class="topbar-title" id="topHome">
+    <svg class="topbar-mark" aria-hidden="true"><use href="#pin-camellia"/></svg>
+    <span id="siteTitle">椿@お絵描き局</span>
+  </button>
+  <button type="button" class="topbar-profile" id="profileChip"></button>
+</header>
+
+<main class="app">
+
+  <!-- ============ ホーム（フィード） ============ -->
+  <section class="page" id="page-home">
+
+    <div class="hero">
+      <p class="hero-tagline" id="siteTagline">絵を展示する場所</p>
+      <nav class="sns" id="snsNav" aria-label="外部リンク"></nav>
+    </div>
+
+    <p class="mode-note" id="modeNote" hidden></p>
+
+    <!-- おすすめ（横に流れる） -->
+    <section class="strip" id="pickup">
+      <div class="strip-head">
+        <h2>製作者のおすすめ</h2>
+        <p id="pickupMessage"></p>
+      </div>
+      <div class="strip-rail" id="pickupRail"></div>
+      <div class="pickup-video" id="pickupVideo" hidden></div>
+    </section>
+
+    <!-- 並び替え -->
+    <div class="feedbar">
+      <div class="feedtabs" role="tablist" aria-label="並び替え">
+        <button type="button" class="feedtab is-active" data-sort="recent" role="tab" aria-selected="true">新着</button>
+        <button type="button" class="feedtab" data-sort="popular" role="tab" aria-selected="false">人気</button>
+      </div>
+      <select id="artistFilter" class="feedfilter" aria-label="描いた人でしぼる">
+        <option value="">ぜんぶ</option>
+      </select>
+    </div>
+
+    <div class="tagbar" data-tagbar hidden aria-label="タグでしぼる"></div>
+
+    <p class="totals" id="totals"></p>
+
+    <div class="feed" id="feed"></div>
+    <div class="feed-sentinel" id="feedSentinel" hidden>
+      <span class="spinner"></span>
+    </div>
+    <p class="empty-note" id="emptyNote" hidden>該当する絵がありません。</p>
+  </section>
+
+  <!-- ============ ギャラリー ============ -->
+  <section class="page" id="page-wall" hidden>
+    <h2 class="page-title">ギャラリー</h2>
+    <p class="page-lead">木の壁に、椿の画鋲で留めてあります。</p>
+    <div class="tagbar" data-tagbar hidden aria-label="タグでしぼる"></div>
+    <div class="board board--wall" id="wall"></div>
+    <p class="empty-note" id="wallEmpty" hidden>まだありません。</p>
+  </section>
+
+  <!-- ============ ブログ ============ -->
+  <section class="page" id="page-blog" hidden>
+    <h2 class="page-title">お知らせ・ブログ</h2>
+    <div class="blog-list" id="blogList"></div>
+    <p class="empty-note" id="blogEmpty" hidden>まだありません。</p>
+  </section>
+
+  <!-- ============ わたし ============ -->
+  <section class="page" id="page-me" hidden>
+    <h2 class="page-title">わたし</h2>
+    <div class="me-card" id="meCard"></div>
+
+    <h3 class="me-sub">いいねした絵</h3>
+    <div class="board board--grid" id="likedGrid"></div>
+    <p class="empty-note" id="likedEmpty" hidden>まだ ❤ を押した絵はありません。</p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p id="footerTitle">椿@お絵描き局</p>
+  <p class="footer-note">絵の無断転載・無断使用はご遠慮ください。</p>
+</footer>
+
+<!-- ===== 下のナビ ===== -->
+<nav class="bottomnav" aria-label="ページの切り替え">
+  <button type="button" data-page="home" class="is-active"><svg><use href="#ic-home"/></svg><span>ホーム</span></button>
+  <button type="button" data-page="wall"><svg><use href="#ic-wall"/></svg><span>ギャラリー</span></button>
+  <button type="button" data-page="blog"><svg><use href="#ic-blog"/></svg><span>ブログ</span></button>
+  <button type="button" data-page="me"><svg><use href="#ic-me"/></svg><span>わたし</span></button>
+</nav>
+
+<!-- ===== ホームに戻る ===== -->
+<button type="button" class="home-btn" id="homeBtn" hidden>
+  <svg aria-hidden="true"><use href="#ic-home"/></svg>
+  <span>ホームに戻る</span>
+</button>
+
+<!-- ===== 拡大表示 ===== -->
+<div class="lb" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="作品の拡大表示">
+  <div class="lb-backdrop" data-close></div>
+
+  <button type="button" class="lb-btn lb-close" data-close aria-label="閉じる">×</button>
+  <button type="button" class="lb-btn lb-nav lb-prev" id="lbPrev" aria-label="前の絵">‹</button>
+  <button type="button" class="lb-btn lb-nav lb-next" id="lbNext" aria-label="次の絵">›</button>
+
+  <div class="lb-body">
+    <div class="lb-stage" id="lbStage">
+      <img id="lbImg" alt="" draggable="false">
+      <div class="lb-zoombar">
+        <button type="button" data-zoom="out" aria-label="縮小">−</button>
+        <span id="lbZoomLabel">100%</span>
+        <button type="button" data-zoom="in" aria-label="拡大">＋</button>
+        <button type="button" data-zoom="reset" class="wide">リセット</button>
+      </div>
+      <p class="lb-hint">ホイール / ピンチで拡大・ドラッグで移動・ダブルクリックで戻す</p>
+    </div>
+
+    <aside class="lb-side">
+      <h3 class="lb-title" id="lbTitle"></h3>
+      <p class="lb-meta"><span id="lbArtist" class="lb-artist"></span><time id="lbDate"></time></p>
+      <p class="lb-desc" id="lbDesc"></p>
+      <ul class="lb-tags" id="lbTags"></ul>
+
+      <div class="lb-stats">
+        <span title="閲覧数"><i class="ic">👁</i><b id="lbViews">0</b></span>
+        <span title="ハート数"><i class="ic">❤</i><b id="lbHearts">0</b></span>
+        <span title="コメント数"><i class="ic">💬</i><b id="lbComments">0</b></span>
+      </div>
+
+      <div class="lb-buttons">
+        <button type="button" class="heart-btn" id="lbHeartBtn">
+          <span class="heart-ic">❤</span><span class="heart-txt">いいね</span>
+        </button>
+        <button type="button" class="share-btn" id="lbShareBtn" aria-label="シェア">
+          <svg aria-hidden="true"><use href="#ic-share"/></svg>
+        </button>
+      </div>
+
+      <h4 class="lb-subhead">コメント</h4>
+      <ol class="comment-list" id="lbCommentList"></ol>
+
+      <div class="comment-gate" id="commentGate" hidden></div>
+
+      <form class="comment-form" id="lbCommentForm" hidden>
+        <p class="comment-as" id="commentAs"></p>
+        <textarea id="cText" maxlength="400" rows="3" placeholder="コメントを書く" required></textarea>
+        <button type="submit">送信する</button>
+      </form>
+    </aside>
+  </div>
+</div>
+
+<!-- ===== プロフィール ===== -->
+<div class="pf" id="profileModal" hidden role="dialog" aria-modal="true" aria-label="プロフィール">
+  <div class="pf-backdrop" data-pfclose></div>
+  <div class="pf-card">
+    <button type="button" class="pf-close" data-pfclose aria-label="閉じる">×</button>
+
+    <h2 class="pf-title">プロフィール</h2>
+    <p class="pf-lead">コメントするには、なまえとアイコンが必要です。<br>ここで作ったものは、この端末に保存されます。</p>
+
+    <div class="pf-preview" id="pfPreview"></div>
+
+    <label class="pf-label" for="pfName">なまえ</label>
+    <input id="pfName" maxlength="20" placeholder="20文字まで" autocomplete="nickname">
+
+    <p class="pf-label">アイコン</p>
+    <div class="pf-icons" id="pfIcons"></div>
+
+    <p class="pf-label">色</p>
+    <div class="pf-colors" id="pfColors"></div>
+
+    <div class="pf-google" id="pfGoogle" hidden>
+      <button type="button" class="pf-gbtn" id="pfGoogleBtn">
+        <svg viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.28-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        <span>Googleアカウントを使う</span>
+      </button>
+      <p class="pf-note">Googleの名前と写真をそのまま使えます。使わなくてもコメントできます。</p>
+    </div>
+
+    <div class="pf-actions">
+      <button type="button" class="pf-save" id="pfSave">保存する</button>
+      <button type="button" class="pf-del"  id="pfClear">消す</button>
+    </div>
+    <p class="pf-msg" id="pfMsg"></p>
+  </div>
+</div>
+
+<!-- ===== お知らせ（一瞬出るやつ） ===== -->
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/demo.js"></script>
+<script src="js/db.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
