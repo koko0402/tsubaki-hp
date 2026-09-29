@@ -14,8 +14,8 @@
 window.Demo = (function () {
 
   const DB_NAME = 'tsubaki-demo';
-  const VERSION = 1;
-  const STORES  = ['meta', 'works', 'posts', 'comments', 'images'];
+  const VERSION = 2;   /* 2: スタンプの置き場を足した */
+  const STORES  = ['meta', 'works', 'posts', 'comments', 'images', 'stamps'];
 
   let dbp = null;
   const urlCache = new Map();   // idb:xxx → blob URL
@@ -32,6 +32,7 @@ window.Demo = (function () {
         if (!db.objectStoreNames.contains('posts'))    db.createObjectStore('posts',    { keyPath: 'id' });
         if (!db.objectStoreNames.contains('comments')) db.createObjectStore('comments', { keyPath: 'id' });
         if (!db.objectStoreNames.contains('images'))   db.createObjectStore('images');
+        if (!db.objectStoreNames.contains('stamps'))   db.createObjectStore('stamps',   { keyPath: 'id' });
       };
       r.onsuccess = () => resolve(r.result);
       r.onerror   = () => reject(r.error);
@@ -172,6 +173,7 @@ window.Demo = (function () {
     text: row.body,
     date: row.date,
     avatar: { icon: row.avatarIcon, color: row.avatarColor, url: row.avatarUrl },
+    stampId: row.stampId || null,
   });
 
   const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
@@ -279,8 +281,9 @@ window.Demo = (function () {
       return out;
     },
 
-    async addComment(workId, profile, text, parentId = null) {
+    async addComment(workId, profile, text, parentId = null, stampId = null) {
       await needLogin();
+      if (!String(text || '').trim() && !stampId) throw new Error('コメントを書くか、スタンプを選んでください');
       const now = new Date().toISOString();
       await put('comments', {
         id: uid(), workId, parentId: parentId || null,
@@ -288,8 +291,50 @@ window.Demo = (function () {
         avatarIcon: profile.url ? null : profile.icon,
         avatarColor: profile.url ? null : profile.color,
         avatarUrl: profile.url || null,
+        stampId: stampId || null,
         createdAt: now,
       });
+    },
+
+    /* ---------- スタンプ（本番と同じ関数名。数の上限だけ簡単に真似する） ---------- */
+    async stamps(ids) {
+      const out = {};
+      for (const id of new Set(ids)) {
+        if (!id) continue;
+        const row = await getKey('stamps', id);
+        if (row) out[id] = row.data;
+      }
+      return out;
+    },
+
+    async myStamps() {
+      const me = await auth.account();
+      if (!me) return [];
+      return (await getAll('stamps'))
+        .filter(r => r.userId === me.id)
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+        .map(r => ({ id: r.id, data: r.data }));
+    },
+
+    async createStamp(data) {
+      const me = await auth.account();
+      if (!me) throw new Error('ログインが必要です');
+      if (!/^data:image\/(png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(data) || data.length > 60000) {
+        throw new Error('スタンプの形式がちがいます');
+      }
+      const mine = (await getAll('stamps')).filter(r => r.userId === me.id);
+      if (mine.length >= 30) throw new Error('スタンプは30個までです。いらないものを消してから作ってください');
+      const id = uid();
+      await put('stamps', { id, userId: me.id, data, createdAt: new Date().toISOString() });
+      return id;
+    },
+
+    async deleteStamp(id) {
+      await del('stamps', id);
+      /* 本番と同じく、使っていたコメントからは外す（コメントは残す） */
+      for (const c of await getAll('comments')) {
+        if (c.stampId === id) await put('comments', { ...c, stampId: null });
+      }
     },
 
     async toggleHeart(workId) {
@@ -421,6 +466,16 @@ window.Demo = (function () {
         .map(c => ({ id: c.id, work_id: c.workId, parent_id: c.parentId || null,
                      name: c.name, body: c.body, created_at: c.createdAt }));
     },
+
+    async listStamps() {
+      await init();
+      return (await getAll('stamps'))
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+        .slice(0, 200)
+        .map(r => ({ id: r.id, user_id: r.userId, data: r.data, created_at: r.createdAt }));
+    },
+
+    async deleteStamp(id) { await api.deleteStamp(id); },
 
     /* 親を消したら、そこにぶら下がっていた返信もいっしょに消す */
     async deleteComment(id) {

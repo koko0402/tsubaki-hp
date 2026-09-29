@@ -60,6 +60,7 @@ const state = {
   blog: [],
   stats: {},
   myHearts: new Set(),
+  myStamps: [],    // 自分が作ったスタンプ [{ id, data }]（シートを開いたときに読む）
   account: null,
   page: 'home',
   sort: 'recent',

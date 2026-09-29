@@ -172,11 +172,65 @@ cur.execute("update public.works set title='乗っ取り' where id='w1'")
 check('[B] 作品は書き換えられない', cur.rowcount == 0, f'{cur.rowcount}件')
 cur.execute('rollback to savepoint w')
 
+# ---------- スタンプ ----------
+PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+as_role(cur, 'anon')
+expect_error(cur, "select public.create_stamp(%s)", (PNG,), name='[未ログイン] スタンプを作れない')
+expect_ok(cur, 'select id from public.stamps', name='[未ログイン] スタンプは見られる')
+
+as_role(cur, 'authenticated', A)
+r = expect_ok(cur, "select public.create_stamp(%s)", (PNG,), name='[A] スタンプを作れる')
+stamp_a = r[0][0] if r else None
+expect_error(cur, "select public.create_stamp(%s)",
+             ('data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+',), name='[A] SVG のスタンプは弾かれる')
+expect_error(cur, "select public.create_stamp(%s)", ('javascript:alert(1)',), name='[A] 画像でない文字列は弾かれる')
+expect_error(cur, "select public.create_stamp(%s)", ('data:image/png;base64,"><img src=x onerror=alert(1)>',),
+             name='[A] base64 に変な文字が混ざると弾かれる')
+expect_error(cur, "select public.create_stamp(%s)", ('data:image/png;base64,' + 'A' * 60000,),
+             name='[A] 大きすぎるスタンプは弾かれる')
+expect_error(cur, "insert into public.stamps (user_id, data) values (%s, %s)", (A, PNG),
+             name='[A] スタンプを直接書き込めない')
+
+# 連投の上限にかからないよう、A の最近のコメントの時刻を少し前にずらしておく
+cur.execute('reset role')
+cur.execute("update public.comments set created_at = now() - interval '2 minutes' where user_id = %s", (A,))
+as_role(cur, 'authenticated', A)
+sc = expect_ok(cur, "select public.create_comment('w1',null,'','A','star','#ff0000',false,%s)", (stamp_a,),
+               name='[A] スタンプだけのコメントを書ける')
+expect_error(cur, "select public.create_comment('w1',null,'','A','star','#ff0000',false,null)",
+             name='[A] 文字もスタンプも無いコメントは弾かれる', contains='スタンプを選んで')
+expect_error(cur, "select public.create_comment('w1',null,'x','A','star','#ff0000',false,gen_random_uuid())",
+             name='[A] 無いスタンプは付けられない', contains='スタンプは見つかりません')
+
+# 1日20個まで（1個はもう作ってある）
+made = 1
+for i in range(19):
+    cur.execute('savepoint s')
+    try:
+        cur.execute("select public.create_stamp(%s)", (PNG,)); made += 1
+        cur.execute('release savepoint s')
+    except Exception:
+        cur.execute('rollback to savepoint s'); break
+check('[A] 1日20個までは作れる', made == 20, f'{made}個')
+expect_error(cur, "select public.create_stamp(%s)", (PNG,), name='[A] 1日21個目は弾かれる', contains='今日は')
+
+as_role(cur, 'authenticated', B)
+expect_error(cur, "select public.delete_stamp(%s)", (stamp_a,), name='[B] 他人のスタンプは消せない')
+r = expect_ok(cur, "select public.create_stamp(%s)", (PNG,), name='[B] スタンプを作れる')
+stamp_b = r[0][0] if r else None
+
+as_role(cur, 'authenticated', A)
+expect_ok(cur, "select public.delete_stamp(%s)", (stamp_a,), name='[A] 自分のスタンプは消せる')
+left = expect_ok(cur, "select stamp_id, body from public.comments where id=%s", (sc[0][0],) if sc else (None,),
+                 name='[A] スタンプを消したあとのコメントを読む')
+check('[A] スタンプを消すと、コメントからは外れる(コメントは残る)', bool(left) and left[0][0] is None, str(left))
+
 # ---------- メールで勝手に登録した人 ----------
 as_role(cur, 'authenticated', MAIL)
 expect_error(cur, "select public.toggle_heart('w1')", name='[メール登録] いいねできない')
 expect_error(cur, "select public.create_comment('w1',null,'x','M','star','#ff0000',false)",
              name='[メール登録] コメントできない')
+expect_error(cur, "select public.create_stamp(%s)", (PNG,), name='[メール登録] スタンプを作れない')
 
 # ---------- 管理人（メールでログイン） ----------
 as_role(cur, 'authenticated', ADM)
@@ -188,6 +242,7 @@ cur.execute("update public.works set title='更新' where id='w2'")
 check('[管理人] 作品を書き換えられる', cur.rowcount == 1)
 expect_ok(cur, "select public.create_comment('w1',null,'管理人です','管理人','leaf','#3f6b46',false)",
           name='[管理人] メールでログインしていてもコメントできる')
+expect_ok(cur, "select public.delete_stamp(%s)", (stamp_b,), name='[管理人] 他人のスタンプを消せる')
 
 conn.rollback()
 conn.close()

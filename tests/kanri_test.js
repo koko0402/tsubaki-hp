@@ -81,6 +81,21 @@ async function main() {
   const saved = await ev(`Demo.admin.settings().then(x => x.title)`);
   check('設定が本当に保存されている', saved === '椿@テスト', saved);
   await ev(`Demo.admin.saveSettings({ title: '椿@お絵描き局' }).then(() => 1)`);
+  /* 見た目タブ（前は押しても中身が出なかった） */
+  await ev(`document.querySelector('.tab[data-tab="look"]').click(); 1`);
+  await sleep(300);
+  check('「見た目」タブを押すと中身が出る', (await ev(`!document.querySelector('#tab-look').classList.contains('hidden')`)) === true);
+
+  /* スタンプタブ：見本モードにスタンプを1つ作ってから開く */
+  await ev(`Demo.auth.signIn().then(() => Demo.api.createStamp('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')).then(() => 1)`);
+  await ev(`document.querySelector('.tab[data-tab="stamps"]').click(); 1`);
+  await sleep(800);
+  check('「スタンプ」タブで一覧が出る', (await ev(`document.querySelectorAll('#stampList .stamp-item').length`)) === 1);
+  await shot('k-スタンプ管理');
+  await ev(`document.querySelector('#stampList [data-sdel]').click(); 1`);
+  await sleep(800);
+  check('管理ページからスタンプを消せる', (await ev(`document.querySelectorAll('#stampList .stamp-item').length`)) === 0);
+
   check('JavaScript のエラーが出ていない', errors.length === 0, errors.join(' / '));
   ws.close(); br.kill(); await sleep(400);
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}

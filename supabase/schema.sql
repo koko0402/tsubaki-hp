@@ -168,6 +168,38 @@ alter table public.comments add constraint comments_avatar_ok check (
 );
 
 -- ------------------------------------------------------------
+-- 5.5 スタンプ（見に来た人が描いて、コメントで使う絵）
+--    ・作れるのはログインした人（can_interact）だけ。create_stamp() 経由でしか作れない
+--    ・中身は小さい画像（PNG か WebP）を data URL の文字列で持つ
+--    ・1人30個まで、1人1日20個まで、サイト全体で3000個まで
+--      （1個あたり最大6万文字 ≒ 45KB なので、全部埋まっても 180MB ほど。無料枠の DB 500MB に収まる）
+--    ・消せるのは作った本人と投稿者（admins）
+-- ------------------------------------------------------------
+create table if not exists public.stamps (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  data       text not null,
+  created_at timestamptz not null default now(),
+  constraint stamps_data_ok check (
+    char_length(data) <= 60000
+    and data ~ '^data:image/(png|webp);base64,[A-Za-z0-9+/]+={0,2}$'
+  )
+);
+create index if not exists stamps_user_idx on public.stamps (user_id, created_at);
+
+-- コメントに付けるスタンプ（1件に1つ）。スタンプが消されたら、コメントからも外れる
+alter table public.comments
+  add column if not exists stamp_id uuid references public.stamps(id) on delete set null;
+
+-- スタンプだけのコメント（本文が空）も書けるようにする。
+-- 「文字かスタンプのどちらかは要る」は create_comment() で確かめる。
+-- （ここで縛ると、スタンプが消されて stamp_id が空になったときに消せなくなるので）
+alter table public.comments drop constraint if exists comments_length;
+alter table public.comments add constraint comments_length check (
+  char_length(body) <= 400 and char_length(name) <= 20
+);
+
+-- ------------------------------------------------------------
 -- 6. ハート／閲覧
 --    ハートはログインした人だけが押せる。1人1作品に1つ。
 --    閲覧数はログインしていなくても数える。visitor_id はブラウザが持つ
@@ -258,8 +290,10 @@ $$;
 --    ・ログインしていないと書けない
 --    ・返信の親は、同じ作品のコメントだけ
 --    ・連投の上限：1分に5件、1日に100件（1人あたり）
+--    ・文字かスタンプのどちらかは要る（スタンプだけのコメントもOK）
 -- ------------------------------------------------------------
 drop function if exists public.create_comment(text, uuid, text, text, text, text, boolean);
+drop function if exists public.create_comment(text, uuid, text, text, text, text, boolean, uuid);
 
 create or replace function public.create_comment(
   p_work_id   text,
@@ -268,7 +302,8 @@ create or replace function public.create_comment(
   p_name      text,
   p_icon      text,
   p_color     text,
-  p_use_photo boolean
+  p_use_photo boolean,
+  p_stamp_id  uuid default null
 )
 returns uuid
 language plpgsql
@@ -285,8 +320,14 @@ begin
   if not public.can_interact() then
     raise exception 'ログインが必要です' using errcode = '28000';
   end if;
-  if char_length(body) not between 1 and 400 then
-    raise exception 'コメントは1〜400文字で書いてください';
+  if char_length(body) > 400 then
+    raise exception 'コメントは400文字までです';
+  end if;
+  if char_length(body) = 0 and p_stamp_id is null then
+    raise exception 'コメントを書くか、スタンプを選んでください';
+  end if;
+  if p_stamp_id is not null and not exists (select 1 from public.stamps where id = p_stamp_id) then
+    raise exception 'そのスタンプは見つかりません';
   end if;
   if char_length(nm) not between 1 and 20 then
     raise exception 'なまえは1〜20文字にしてください';
@@ -318,15 +359,72 @@ begin
   end if;
 
   insert into public.comments
-    (work_id, parent_id, name, body, avatar_icon, avatar_color, avatar_url, user_id)
+    (work_id, parent_id, name, body, avatar_icon, avatar_color, avatar_url, user_id, stamp_id)
   values
     (p_work_id, p_parent_id, nm, body,
      case when photo is null then p_icon  end,
      case when photo is null then p_color end,
-     photo, uid)
+     photo, uid, p_stamp_id)
   returning id into new_id;
 
   return new_id;
+end;
+$$;
+
+-- ------------------------------------------------------------
+-- 8.6 スタンプを作る・消す
+-- ------------------------------------------------------------
+create or replace function public.create_stamp(p_data text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid    uuid := auth.uid();
+  new_id uuid;
+begin
+  if not public.can_interact() then
+    raise exception 'ログインが必要です' using errcode = '28000';
+  end if;
+  if p_data is null or char_length(p_data) > 60000 then
+    raise exception 'スタンプの絵が大きすぎます';
+  end if;
+  if p_data !~ '^data:image/(png|webp);base64,[A-Za-z0-9+/]+={0,2}$' then
+    raise exception 'スタンプの形式がちがいます';
+  end if;
+  if (select count(*) from public.stamps where user_id = uid) >= 30 then
+    raise exception 'スタンプは30個までです。いらないものを消してから作ってください';
+  end if;
+  if (select count(*) from public.stamps
+      where user_id = uid and created_at > now() - interval '1 day') >= 20 then
+    raise exception '今日はもうスタンプを作れません';
+  end if;
+  if (select count(*) from public.stamps) >= 3000 then
+    raise exception 'サイト全体のスタンプがいっぱいです';
+  end if;
+
+  insert into public.stamps (user_id, data) values (uid, p_data)
+  returning id into new_id;
+  return new_id;
+end;
+$$;
+
+create or replace function public.delete_stamp(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'ログインが必要です' using errcode = '28000';
+  end if;
+  delete from public.stamps
+   where id = p_id and (user_id = auth.uid() or public.is_admin());
+  if not found then
+    raise exception 'そのスタンプは消せません';
+  end if;
 end;
 $$;
 
@@ -353,6 +451,7 @@ alter table public.blog_posts    enable row level security;
 alter table public.comments      enable row level security;
 alter table public.hearts        enable row level security;
 alter table public.work_views    enable row level security;
+alter table public.stamps        enable row level security;
 
 -- 同じ名前のルールが残っていると作り直せないので、先に消す
 drop policy if exists "admins self read"    on public.admins;
@@ -368,6 +467,7 @@ drop policy if exists "comments admin del"  on public.comments;
 drop policy if exists "hearts read"         on public.hearts;
 drop policy if exists "hearts own read"     on public.hearts;
 drop policy if exists "views read"          on public.work_views;
+drop policy if exists "stamps read"         on public.stamps;
 
 -- 自分が投稿者かどうかだけ確認できる
 create policy "admins self read" on public.admins
@@ -383,6 +483,10 @@ create policy "comments read"  on public.comments      for select using (true);
 create policy "hearts own read" on public.hearts
   for select to authenticated using (user_id = auth.uid());
 -- work_views は誰も直接は読めない（数は work_stats() で返す）
+
+-- スタンプは誰でも見られる（コメントに付いているものを表示するため）。
+-- 作る・消すのは create_stamp() / delete_stamp() 経由だけ
+create policy "stamps read" on public.stamps for select using (true);
 
 -- 書き換えられるのは admins に載っている人だけ
 create policy "settings admin write" on public.site_settings
@@ -414,6 +518,8 @@ grant select on public.works, public.blog_posts, public.site_settings, public.co
 revoke insert, update, delete on public.comments   from anon, authenticated;
 revoke all                    on public.hearts     from anon, authenticated;
 revoke all                    on public.work_views from anon, authenticated;
+revoke all                    on public.stamps     from anon, authenticated;
+grant select (id, user_id, data, created_at) on public.stamps to anon, authenticated;
 
 grant select on public.hearts        to authenticated;   -- 見えるのは自分の分だけ（上のルール）
 grant insert, update, delete on public.works, public.blog_posts to authenticated;
@@ -423,7 +529,9 @@ grant select on public.admins        to authenticated;
 
 -- 関数は、書いた人以外が勝手に呼べないよう一度閉じてから、必要な相手にだけ開ける
 revoke execute on function public.toggle_heart(text)  from public;
-revoke execute on function public.create_comment(text, uuid, text, text, text, text, boolean) from public;
+revoke execute on function public.create_comment(text, uuid, text, text, text, text, boolean, uuid) from public;
+revoke execute on function public.create_stamp(text) from public;
+revoke execute on function public.delete_stamp(uuid) from public;
 revoke execute on function public.register_view(text, uuid) from public;
 revoke execute on function public.work_stats() from public;
 revoke execute on function public.is_admin() from public;
@@ -432,7 +540,9 @@ revoke execute on function public.can_interact() from public;
 grant execute on function public.work_stats()               to anon, authenticated;
 grant execute on function public.register_view(text, uuid)  to anon, authenticated;
 grant execute on function public.toggle_heart(text)         to authenticated;
-grant execute on function public.create_comment(text, uuid, text, text, text, text, boolean) to authenticated;
+grant execute on function public.create_comment(text, uuid, text, text, text, text, boolean, uuid) to authenticated;
+grant execute on function public.create_stamp(text) to authenticated;
+grant execute on function public.delete_stamp(uuid) to authenticated;
 grant execute on function public.is_admin() to authenticated;
 
 -- ------------------------------------------------------------

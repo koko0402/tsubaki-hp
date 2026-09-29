@@ -85,6 +85,7 @@ window.DB = (function () {
     text: row.body,
     date: String(row.created_at).slice(0, 10),
     avatar: { icon: row.avatar_icon, color: row.avatar_color, url: row.avatar_url },
+    stampId: row.stamp_id || null,
   });
 
   /** ログイン中の人のID（していなければ null）。通信せずに手元の情報だけで見る */
@@ -178,7 +179,7 @@ window.DB = (function () {
     },
 
     /* 書いた人と日時はサーバーが決める。ここから送るのは中身と、なまえ・アイコンだけ */
-    async addComment(workId, profile, text, parentId = null) {
+    async addComment(workId, profile, text, parentId = null, stampId = null) {
       const res = await sb.rpc('create_comment', {
         p_work_id:   workId,
         p_parent_id: parentId || null,
@@ -187,7 +188,39 @@ window.DB = (function () {
         p_icon:      profile.icon,
         p_color:     profile.color,
         p_use_photo: !!profile.url,
+        p_stamp_id:  stampId || null,
       });
+      if (res.error) throw new Error(res.error.message);
+    },
+
+    /* ---------- スタンプ ---------- */
+
+    /** id の一覧 → { id: dataURL }。コメントに付いているスタンプを表示するときに使う */
+    async stamps(ids) {
+      const list = [...new Set(ids)].filter(Boolean);
+      if (!list.length) return {};
+      const rows = ok(await sb.from('stamps').select('id,data').in('id', list), 'スタンプの読み込み') || [];
+      return Object.fromEntries(rows.map(r => [r.id, r.data]));
+    },
+
+    /** 自分が作ったスタンプ（新しい順）→ [{ id, data }] */
+    async myStamps() {
+      const me = await currentUserId();
+      if (!me) return [];
+      const rows = ok(await sb.from('stamps').select('id,data')
+        .eq('user_id', me).order('created_at', { ascending: false }), 'スタンプの読み込み');
+      return rows || [];
+    },
+
+    /** 作ったスタンプの id を返す */
+    async createStamp(data) {
+      const res = await sb.rpc('create_stamp', { p_data: data });
+      if (res.error) throw new Error(res.error.message);
+      return res.data;
+    },
+
+    async deleteStamp(id) {
+      const res = await sb.rpc('delete_stamp', { p_id: id });
       if (res.error) throw new Error(res.error.message);
     },
 
@@ -346,6 +379,18 @@ window.DB = (function () {
       const rows = ok(await sb.from('comments').select('*')
         .order('created_at', { ascending: false }).limit(100), 'コメント一覧');
       return rows || [];
+    },
+
+    /** 新しい順に200個まで → [{ id, user_id, data, created_at }] */
+    async listStamps() {
+      const rows = ok(await sb.from('stamps').select('id,user_id,data,created_at')
+        .order('created_at', { ascending: false }).limit(200), 'スタンプ一覧');
+      return rows || [];
+    },
+
+    async deleteStamp(id) {
+      const res = await sb.rpc('delete_stamp', { p_id: id });
+      if (res.error) throw new Error('スタンプの削除: ' + res.error.message);
     },
   };
 

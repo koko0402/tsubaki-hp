@@ -103,6 +103,9 @@ function bindUI() {
     const tagBtn = e.target.closest('[data-tag]');
     if (tagBtn) { e.preventDefault(); setTag(tagBtn.dataset.tag); return; }
 
+    const stampBtn = e.target.closest('[data-stamp-for]');
+    if (stampBtn) { openStampSheet(stampBtn.dataset.stampFor, stampBtn.dataset.stampParent || null); return; }
+
     const toComments = e.target.closest('[data-open-comments]');
     if (toComments) { openLightbox(toComments.dataset.openComments, 0, { toComments: true }); return; }
 
@@ -277,6 +280,7 @@ async function boot() {
 }
 
 buildProfileModal();
+bindStamps();
 bindUI();
 bindLightbox();
 bindInfiniteScroll();

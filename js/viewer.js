@@ -91,7 +91,7 @@ function commentHTML(c, isReply) {
           <span class="c-name">${esc(c.name || 'ななし')}</span>
           <time>${fmtDate(c.date)}</time>
         </div>
-        <p class="c-text">${esc(c.text)}</p>
+        ${commentBodyHTML(c)}
         <button type="button" class="c-reply-btn" data-reply="${esc(c.id)}" data-reply-to="${esc(c.name || 'ななし')}">返信</button>
       </div>
     </div>`;
@@ -157,6 +157,7 @@ function openReplyBox(rootId, toName) {
   box.innerHTML =
     avatar(p, 24) +
     `<input type="text" maxlength="400" placeholder="${esc(toName || '')}さんに返信" aria-label="返信を書く">` +
+    `<button type="button" class="stamp-btn" data-stamp-for="${esc(lb.id)}" data-stamp-parent="${esc(rootId)}" aria-label="スタンプ"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="1.3" fill="currentColor"/><circle cx="15" cy="10" r="1.3" fill="currentColor"/><path d="M8.2 14.2a4.4 4.4 0 0 0 7.6 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>` +
     '<button type="submit">送信</button>' +
     '<button type="button" class="c-cancel">やめる</button>';
 
@@ -198,6 +199,7 @@ async function loadComments(id) {
   $('#lbCommentList').innerHTML = '<li><span class="comment-empty">読み込み中…</span></li>';
   try {
     const list = await api.comments(id);
+    await loadStamps(list.map(c => c.stampId));
     if (token !== lb.token) return;
     paintComments(list);
   } catch (err) {
@@ -398,6 +400,14 @@ async function submitInline(form) {
   }
 }
 
+/** コメントやスタンプを送ったあと、数と一覧を合わせ直す */
+async function afterCommentSent(id) {
+  bumpComment(id);
+  patchPost(id);
+  await fillPostComments([id]);
+  if (!lb.root.hidden && lb.id === id) { lbRenderStats(id); await loadComments(id); }
+}
+
 function bumpComment(id) {
   const s = statOf(id);
   s.comments += 1;
@@ -416,6 +426,7 @@ function bindLightbox() {
   $('#lbHeartBtn').addEventListener('click', () => toggleHeartFor(lb.id, $('#lbHeartBtn')));
   $('#lbShareBtn').addEventListener('click', () => share(lb.id));
   $('#lbCommentForm').addEventListener('submit', submitComment);
+  $('#lbStampBtn').addEventListener('click', () => openStampSheet(lb.id));
 
   $('#lbCommentList').addEventListener('click', e => {
     const btn = e.target.closest('[data-reply]');

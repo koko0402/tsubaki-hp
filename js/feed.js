@@ -125,6 +125,7 @@ function writeBoxHTML(id) {
   return `
     ${avatar(p, 28)}
     <input type="text" maxlength="400" placeholder="コメントを書く" aria-label="コメントを書く">
+    <button type="button" class="stamp-btn" data-stamp-for="${esc(id)}" aria-label="スタンプ"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="1.3" fill="currentColor"/><circle cx="15" cy="10" r="1.3" fill="currentColor"/><path d="M8.2 14.2a4.4 4.4 0 0 0 7.6 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     <button type="submit">送信</button>`;
 }
 
@@ -242,6 +243,7 @@ async function fillPostComments(ids) {
   if (!ids.length) return;
   let map = {};
   try { map = await api.recentComments(ids, 2); } catch (err) { console.warn(err); return; }
+  await loadStamps(Object.values(map).flat().map(c => c.stampId));
 
   for (const id of ids) {
     const box = $(`.post[data-work="${CSS.escape(id)}"] [data-comments]`);
@@ -257,7 +259,7 @@ async function fillPostComments(ids) {
           ${avatar(c.avatar, 26)}
           <div class="c-main">
             <span class="c-name">${esc(c.name || 'ななし')}</span>
-            <p class="c-text">${esc(c.text)}</p>
+            ${commentBodyHTML(c)}
           </div>
         </div>`).join('') +
       (total > list.length

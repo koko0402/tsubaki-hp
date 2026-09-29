@@ -1186,3 +1186,114 @@ body.no-shadow .card-pin{
 /* 文章だけの投稿 */
 .post.is-text .post-text{ padding-bottom:4px; }
 .post.is-text .post-title{ font-size:19px; }
+
+
+/* ============================================================
+   手描きスタンプ
+   ============================================================ */
+
+/* 書き込み欄の横のスタンプボタン（フィード・返信・拡大表示で共通） */
+.post-write .stamp-btn,
+.c-replybox .stamp-btn,
+.stamp-btn{
+  flex:0 0 auto; display:inline-grid; place-items:center;
+  width:40px; height:40px; padding:0;
+  color:var(--ink-soft); background:transparent;
+  border:1.5px solid rgba(44,32,24,.2); border-radius:50%; cursor:pointer;
+}
+.post-write .stamp-btn:hover,
+.c-replybox .stamp-btn:hover,
+.stamp-btn:hover{ color:var(--camellia); border-color:var(--camellia); background:transparent; }
+.stamp-btn svg{ width:22px; height:22px; }
+
+.comment-send{ display:flex; align-items:center; justify-content:flex-end; gap:8px; }
+
+/* コメントの中のスタンプ */
+.c-stamp{
+  display:block; width:96px; height:96px; margin:4px 0 2px;
+  object-fit:contain;
+}
+.post-c .c-stamp{ width:72px; height:72px; }
+.c-stamp-gone{ display:block; font-size:11.5px; color:var(--ink-soft); }
+
+/* ---- スタンプを選ぶシート（下からせり上がる） ---- */
+.sheet{ position:fixed; inset:0; z-index:105; display:flex; align-items:flex-end; justify-content:center; }
+.sheet[hidden]{ display:none; }
+.sheet-backdrop{ position:absolute; inset:0; background:rgba(14,8,3,.55); }
+.sheet-card{
+  position:relative; width:100%; max-width:560px; max-height:70vh; overflow-y:auto;
+  padding:8px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  background:linear-gradient(180deg,#f8f2e6,#ece2cf);
+  border-radius:18px 18px 0 0;
+  box-shadow:0 -12px 40px rgba(0,0,0,.45);
+  animation:sheet-up .22s ease-out;
+}
+@keyframes sheet-up{ from{ transform:translateY(40px); opacity:.4; } to{ transform:none; opacity:1; } }
+@media (prefers-reduced-motion: reduce){ .sheet-card{ animation:none; } }
+.sheet-grip{ width:40px; height:4px; margin:4px auto 10px; border-radius:2px; background:rgba(44,32,24,.25); }
+.sheet-head{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.sheet-head h2{ flex:1; margin:0; font-family:var(--font-serif); font-size:16px; letter-spacing:.08em; }
+.sheet-head h2 small{ font-family:var(--font-sans); font-size:11.5px; color:var(--ink-soft); letter-spacing:0; margin-left:6px; }
+.sheet-head [hidden]{ display:none; }
+.sheet-close{
+  width:36px; height:36px; font-size:20px; line-height:1;
+  background:none; border:0; cursor:pointer; color:var(--ink-soft);
+}
+
+.stamp-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(78px, 1fr)); gap:10px; }
+.stamp-tile,
+.stamp-new{
+  position:relative; aspect-ratio:1; min-height:72px;
+  display:grid; place-items:center; padding:6px;
+  background:#fff; border:1.5px solid rgba(44,32,24,.12); border-radius:14px; cursor:pointer;
+  transition:transform .12s, border-color .12s;
+}
+.stamp-tile:hover{ border-color:var(--camellia); }
+.stamp-tile:active{ transform:scale(.94); }
+.stamp-tile img{ width:100%; height:100%; object-fit:contain; pointer-events:none; }
+.stamp-new{ gap:2px; color:var(--camellia); border-style:dashed; border-color:rgba(198,43,61,.45); font-size:12px; font-weight:700; }
+.stamp-new svg{ width:26px; height:26px; }
+.stamp-del{
+  position:absolute; top:-6px; right:-6px; width:22px; height:22px;
+  display:grid; place-items:center; font-style:normal; font-size:14px; line-height:1;
+  color:#fff; background:var(--camellia); border-radius:50%;
+}
+.stamp-grid.is-editing .stamp-tile{ animation:stamp-wiggle .3s ease-in-out infinite alternate; }
+@keyframes stamp-wiggle{ from{ transform:rotate(-2deg); } to{ transform:rotate(2deg); } }
+@media (prefers-reduced-motion: reduce){ .stamp-grid.is-editing .stamp-tile{ animation:none; } }
+.stamp-note{ grid-column:1 / -1; margin:4px 0 0; font-size:12.5px; color:var(--ink-soft); line-height:1.7; }
+
+/* ---- ホワイトボード ---- */
+#stampBoard{ z-index:112; }
+.sb-card{ max-width:400px; }
+.sb-board{
+  width:100%; max-width:320px; margin:14px auto 0; aspect-ratio:1;
+  background:#fff;
+  background-image:
+    linear-gradient(rgba(61,126,166,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61,126,166,.08) 1px, transparent 1px);
+  background-size:20px 20px;
+  border:2px solid #d7d0c4; border-radius:14px;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.06);
+  overflow:hidden;
+}
+.sb-board canvas{ display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+.sb-pens{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:14px; }
+.sb-pens button{
+  width:32px; height:32px; border-radius:50%; cursor:pointer;
+  border:2px solid rgba(0,0,0,.15);
+}
+.sb-pens button.is-on{ outline:3px solid var(--camellia); outline-offset:2px; }
+.sb-row{ display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin-top:10px; }
+.sb-size{
+  display:grid; place-items:center; width:40px; height:40px; cursor:pointer;
+  background:#fff; border:1.5px solid rgba(44,32,24,.2); border-radius:10px;
+}
+.sb-size i{ display:block; border-radius:50%; background:var(--ink); }
+.sb-size.is-on{ border-color:var(--camellia); box-shadow:0 0 0 2px rgba(198,43,61,.25); }
+#sbEraser.is-on{ background:var(--ink); border-color:var(--ink); color:#fff; }
+
+/* スタンプのシートが出ている間は、お知らせを上に出す（シートに重ならないように） */
+body:has(#stampSheet:not([hidden])) .toast{
+  top:calc(70px + env(safe-area-inset-top, 0px)); bottom:auto;
+}
