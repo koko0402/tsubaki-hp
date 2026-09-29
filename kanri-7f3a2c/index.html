@@ -579,6 +579,63 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 /* ============================================================
    絵
    ============================================================ */
+/* ============================================================
+   大きい絵は、上げる前に縮める
+   ------------------------------------------------------------
+   スマホの写真などをそのまま上げると、見に来た人が開くたびに重い通信になり、
+   Supabase の無料枠（通信量 月5GB）が早く減る。
+   ・長い辺を 2400px まで（拡大表示でズームしても細かいところが残る大きさ）
+   ・WebP にできればする。できないブラウザ（iPhone など）は JPEG、透明のある絵は PNG
+   ・もともと小さい／縮めても軽くならないときは、元のまま上げる
+   ・GIF や SVG は触らない（アニメや線の情報が消えるので）
+   ============================================================ */
+const MAX_SIDE = 2400;
+const KEEP_IF_UNDER = 800 * 1024;   /* これより軽くて大きさも範囲内なら、何もしない */
+
+/** 透明なところがあるか（全部は見ずに、間引いて調べる） */
+function hasTransparency(g, w, h) {
+  const d = g.getImageData(0, 0, w, h).data;
+  const step = 4 * 7;
+  for (let i = 3; i < d.length; i += step) if (d[i] < 250) return true;
+  return false;
+}
+
+async function shrinkImage(file, maxSide = MAX_SIDE) {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
+
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch { return file; }
+
+  const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+  if (scale === 1 && file.size <= KEEP_IF_UNDER) { bmp.close?.(); return file; }
+
+  const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const g = cv.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(bmp, 0, 0, w, h);
+  bmp.close?.();
+
+  const toBlob = (type, q) => new Promise(res => cv.toBlob(res, type, q));
+
+  /* WebP を試して、だめ（作れない・元より重い）なら PNG か JPEG も試す。いちばん軽いものを使う */
+  const tries = [];
+  const webp = await toBlob('image/webp', 0.9);
+  if (webp && webp.type === 'image/webp') tries.push(webp);
+  if (!tries.length || tries[0].size >= file.size) {
+    const alpha = file.type !== 'image/jpeg' && hasTransparency(g, w, h);
+    const other = alpha ? await toBlob('image/png') : await toBlob('image/jpeg', 0.9);
+    if (other) tries.push(other);
+  }
+  const out = tries.sort((a, b) => a.size - b.size)[0];
+  if (!out || out.size >= file.size) return file;   /* どれも軽くならないなら元のまま */
+
+  const ext = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' }[out.type] || 'png';
+  const name = (file.name.replace(/\.[^.]+$/, '') || 'image') + '.' + ext;
+  return new File([out], name, { type: out.type });
+}
+
 function newWorkId() {
   const d = new Date(), p = n => String(n).padStart(2, '0');
   const r = Math.random().toString(36).slice(2, 6);
@@ -678,7 +735,7 @@ $('#wSave').addEventListener('click', async () => {
         const it = workImages[i];
         if (!it.path) {
           say('#wMsg', `画像を送っています…（${i + 1}/${workImages.length}）`);
-          it.path = await ADMIN.uploadImage(it.file);
+          it.path = await ADMIN.uploadImage(await shrinkImage(it.file));
         }
         imagePaths.push(it.path);
       }
@@ -941,7 +998,7 @@ $('#bgSave').addEventListener('click', async () => {
   try {
     const file = $('#bgFile').files[0];
     let url = $('#bgUrl').value.trim();
-    if (file) url = await ADMIN.uploadImage(file);
+    if (file) url = await ADMIN.uploadImage(await shrinkImage(file));
 
     await ADMIN.saveSettings({
       bg_image: url,

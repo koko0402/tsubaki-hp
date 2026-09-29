@@ -81,6 +81,46 @@ async function main() {
   const saved = await ev(`Demo.admin.settings().then(x => x.title)`);
   check('設定が本当に保存されている', saved === '椿@テスト', saved);
   await ev(`Demo.admin.saveSettings({ title: '椿@お絵描き局' }).then(() => 1)`);
+  /* 上げる前に縮める処理 */
+  const shrink = await ev(`(async () => {
+    /* 模様を細かくして、わざと重い絵を作る */
+    const make = (w, h, type, transparent) => new Promise(res => {
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      if (!transparent) { g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); }
+      for (let i = 0; i < 4000; i++) {
+        g.fillStyle = 'hsl(' + (i * 37 % 360) + ',70%,50%)';
+        g.fillRect((i * 131) % w, (i * 197) % h, 30 + i % 40, 30 + i % 50);
+      }
+      if (transparent) g.clearRect(0, 0, 200, 200);   /* 左上は透明のまま */
+      c.toBlob(b => res(new File([b], 'test.' + (type === 'image/png' ? 'png' : 'jpg'), { type })), type, .95);
+    });
+    const size = async f => { const b = await createImageBitmap(f); const r = [b.width, b.height]; b.close(); return r; };
+    const alphaAt = async (f, x, y) => { const b = await createImageBitmap(f); const c = document.createElement('canvas');
+      c.width = b.width; c.height = b.height; const g = c.getContext('2d'); g.drawImage(b, 0, 0); return g.getImageData(x, y, 1, 1).data[3]; };
+
+    const big = await make(4000, 3000, 'image/jpeg', false);
+    const bigOut = await shrinkImage(big);
+    const small = await make(800, 600, 'image/jpeg', false);
+    const smallOut = await shrinkImage(small);
+    const clear = await make(3000, 3000, 'image/png', true);
+    const clearOut = await shrinkImage(clear);
+    const gif = new File([new Uint8Array([71,73,70,56,57,97])], 'a.gif', { type: 'image/gif' });
+    return {
+      bigIn: big.size, bigOut: bigOut.size, bigDim: await size(bigOut), bigType: bigOut.type,
+      smallSame: smallOut === small,
+      clearDim: await size(clearOut), clearAlpha: await alphaAt(clearOut, 10, 10), clearType: clearOut.type,
+      clearIn: clear.size, clearOutSize: clearOut.size,
+      gifSame: (await shrinkImage(gif)) === gif,
+    };
+  })()`);
+  check('大きい絵(4000x3000)は長い辺2400pxに縮む', shrink.bigDim[0] === 2400 && shrink.bigDim[1] === 1800, JSON.stringify(shrink.bigDim));
+  check('縮めると軽くなる', shrink.bigOut < shrink.bigIn, `${shrink.bigIn} → ${shrink.bigOut}`);
+  check('小さい絵はそのまま上げる', shrink.smallSame === true);
+  check('透明のある絵は、透明が残る', shrink.clearAlpha === 0, JSON.stringify({ a: shrink.clearAlpha, t: shrink.clearType }));
+  check('透明のある絵も、元より重くならない', shrink.clearOutSize <= shrink.clearIn, `${shrink.clearIn} → ${shrink.clearOutSize}`);
+  check('GIF は触らない', shrink.gifSame === true);
+
   /* 見た目タブ（前は押しても中身が出なかった） */
   await ev(`document.querySelector('.tab[data-tab="look"]').click(); 1`);
   await sleep(300);
