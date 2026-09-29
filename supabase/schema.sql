@@ -28,6 +28,24 @@ as $$
   select exists (select 1 from public.admins where user_id = auth.uid());
 $$;
 
+-- 「今ログインしている人は、いいね・コメントしてよい人か？」
+--   Google でログインした人と、投稿者（admins）だけ。
+--   Google ログインのために新規登録をオンにすると、メール＋合言葉での登録も
+--   開いてしまう。捨てアドレスで大量に作られても書き込めないように、ここで絞る。
+create or replace function public.can_interact()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select auth.uid() is not null and (
+    public.is_admin()
+    or coalesce(auth.jwt()->'app_metadata'->>'provider', '') = 'google'
+    or coalesce(auth.jwt()->'app_metadata'->'providers', '[]'::jsonb) ? 'google'
+  );
+$$;
+
 -- ------------------------------------------------------------
 -- 2. サイト設定（1行だけ持つテーブル）
 -- ------------------------------------------------------------
@@ -54,10 +72,6 @@ alter table public.site_settings
 --   bg_mode は 'cover'（全面に伸ばす）か 'tile'（並べて敷き詰める）。
 --   bg_dim は背景を暗くする度合い 0〜0.7。明るい絵で文字が読みにくいときに上げます。
 -- 見た目（色・角丸・影・フォント・幅）／ページの出し分け／自分で足すCSS
--- 1投稿に複数枚の絵。空なら image_path の1枚だけ
-alter table public.works
-  add column if not exists image_paths text[] not null default '{}';
-
 alter table public.site_settings
   add column if not exists theme      jsonb not null default '{}'::jsonb;
 alter table public.site_settings
@@ -91,6 +105,11 @@ create table if not exists public.works (
   pickup_order int,
   created_at   timestamptz not null default now()
 );
+
+-- 1投稿に複数枚の絵。空なら image_path の1枚だけ
+-- （works を作ったあとでないと足せないので、ここに置く）
+alter table public.works
+  add column if not exists image_paths text[] not null default '{}';
 
 create index if not exists works_posted_on_idx on public.works (posted_on desc);
 
@@ -136,17 +155,40 @@ alter table public.comments
 
 create index if not exists comments_work_idx   on public.comments (work_id, created_at);
 create index if not exists comments_parent_idx on public.comments (parent_id);
+create index if not exists comments_user_idx   on public.comments (user_id, created_at);
+
+-- アイコンに入れてよい値だけに絞る。
+-- 画面側で変な値を弾いていても、APIを直接叩かれたら素通りするので、ここでも止める。
+alter table public.comments drop constraint if exists comments_avatar_ok;
+alter table public.comments add constraint comments_avatar_ok check (
+  (avatar_color is null or avatar_color ~ '^#[0-9a-fA-F]{6}$')
+  and (avatar_icon is null or avatar_icon in
+       ('camellia','star','moon','cat','leaf','drop','note','heart'))
+  and (avatar_url is null or avatar_url like 'https://lh3.googleusercontent.com/%')
+);
 
 -- ------------------------------------------------------------
 -- 6. ハート／閲覧
---    visitor_id は、見に来た人のブラウザが持つランダムなIDです。
---    誰かは分かりません（同じ人が連打しても1回に数えるためだけのもの）。
+--    ハートはログインした人だけが押せる。1人1作品に1つ。
+--    閲覧数はログインしていなくても数える。visitor_id はブラウザが持つ
+--    ランダムなIDで、同じ人が何度開いても1日1回に数えるためだけのもの。
 -- ------------------------------------------------------------
+
+-- 古い作り（visitor_id で数えていた頃）の hearts が残っていたら作り直す。
+-- 公開前の試しのデータしか入っていないはずなので、中身は捨てる。
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'hearts' and column_name = 'visitor_id') then
+    drop table public.hearts cascade;
+  end if;
+end $$;
+
 create table if not exists public.hearts (
   work_id    text not null references public.works(id) on delete cascade,
-  visitor_id uuid not null,
+  user_id    uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
-  primary key (work_id, visitor_id)
+  primary key (work_id, user_id)
 );
 
 create table if not exists public.work_views (
@@ -158,37 +200,133 @@ create table if not exists public.work_views (
 
 -- ------------------------------------------------------------
 -- 7. 数の集計（閲覧数・ハート数・コメント数）
+--    hearts と work_views は、中身（誰が押したか）を外から読めないようにしてある。
+--    数だけはこの関数で返す。security definer なので、関数の中だけは全部数えられる。
 -- ------------------------------------------------------------
-create or replace view public.work_stats
-with (security_invoker = on) as
-select
-  w.id                                     as work_id,
-  w.base_views  + coalesce(v.n, 0)::int    as views,
-  w.base_hearts + coalesce(h.n, 0)::int    as hearts,
-  coalesce(c.n, 0)::int                    as comments
-from public.works w
-left join (select work_id, count(*) n from public.work_views group by work_id) v on v.work_id = w.id
-left join (select work_id, count(*) n from public.hearts     group by work_id) h on h.work_id = w.id
-left join (select work_id, count(*) n from public.comments   group by work_id) c on c.work_id = w.id;
+drop view if exists public.work_stats;
+
+create or replace function public.work_stats()
+returns table (work_id text, views int, hearts int, comments int)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    w.id,
+    w.base_views  + coalesce(v.n, 0)::int,
+    w.base_hearts + coalesce(h.n, 0)::int,
+    coalesce(c.n, 0)::int
+  from public.works w
+  left join (select work_id, count(*) n from public.work_views group by work_id) v on v.work_id = w.id
+  left join (select work_id, count(*) n from public.hearts     group by work_id) h on h.work_id = w.id
+  left join (select work_id, count(*) n from public.comments   group by work_id) c on c.work_id = w.id;
+$$;
 
 -- ------------------------------------------------------------
 -- 8. ハートの ON/OFF と 閲覧の記録
 --    直接 insert / delete させず、この関数経由だけにしています。
---    （他人のハートを消せないようにするため）
+--    ハートは「今ログインしている人」の分しか動かせません。
 -- ------------------------------------------------------------
-create or replace function public.toggle_heart(p_work_id text, p_visitor uuid)
+drop function if exists public.toggle_heart(text, uuid);
+
+create or replace function public.toggle_heart(p_work_id text)
 returns boolean                       -- true = 押した状態になった
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  uid uuid := auth.uid();
 begin
-  delete from public.hearts where work_id = p_work_id and visitor_id = p_visitor;
+  if not public.can_interact() then
+    raise exception 'ログインが必要です' using errcode = '28000';
+  end if;
+  delete from public.hearts where work_id = p_work_id and user_id = uid;
   if found then
     return false;
   end if;
-  insert into public.hearts (work_id, visitor_id) values (p_work_id, p_visitor);
+  insert into public.hearts (work_id, user_id) values (p_work_id, uid);
   return true;
+end;
+$$;
+
+-- ------------------------------------------------------------
+-- 8.5 コメントを書く
+--    直接 insert はさせず、この関数経由だけ。
+--    書いた人（user_id）と日時は、ここでサーバーが決める。送られてきた値は使わない。
+--    ・ログインしていないと書けない
+--    ・返信の親は、同じ作品のコメントだけ
+--    ・連投の上限：1分に5件、1日に100件（1人あたり）
+-- ------------------------------------------------------------
+drop function if exists public.create_comment(text, uuid, text, text, text, text, boolean);
+
+create or replace function public.create_comment(
+  p_work_id   text,
+  p_parent_id uuid,
+  p_body      text,
+  p_name      text,
+  p_icon      text,
+  p_color     text,
+  p_use_photo boolean
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid    uuid := auth.uid();
+  body   text := btrim(coalesce(p_body, ''));
+  nm     text := btrim(coalesce(p_name, ''));
+  photo  text;
+  new_id uuid;
+begin
+  if not public.can_interact() then
+    raise exception 'ログインが必要です' using errcode = '28000';
+  end if;
+  if char_length(body) not between 1 and 400 then
+    raise exception 'コメントは1〜400文字で書いてください';
+  end if;
+  if char_length(nm) not between 1 and 20 then
+    raise exception 'なまえは1〜20文字にしてください';
+  end if;
+  if not exists (select 1 from public.works where id = p_work_id) then
+    raise exception 'その作品は見つかりません';
+  end if;
+  if p_parent_id is not null and not exists (
+       select 1 from public.comments where id = p_parent_id and work_id = p_work_id) then
+    raise exception '返信先のコメントが見つかりません';
+  end if;
+
+  if (select count(*) from public.comments
+      where user_id = uid and created_at > now() - interval '1 minute') >= 5 then
+    raise exception '少し時間をおいてから書いてください';
+  end if;
+  if (select count(*) from public.comments
+      where user_id = uid and created_at > now() - interval '1 day') >= 100 then
+    raise exception '今日はもう書き込めません';
+  end if;
+
+  -- Google の写真を使うときは、送られてきたURLではなく、ログイン情報から取る
+  if p_use_photo then
+    select coalesce(raw_user_meta_data->>'avatar_url', raw_user_meta_data->>'picture')
+      into photo from auth.users where id = uid;
+    if photo is null or photo not like 'https://lh3.googleusercontent.com/%' then
+      photo := null;
+    end if;
+  end if;
+
+  insert into public.comments
+    (work_id, parent_id, name, body, avatar_icon, avatar_color, avatar_url, user_id)
+  values
+    (p_work_id, p_parent_id, nm, body,
+     case when photo is null then p_icon  end,
+     case when photo is null then p_color end,
+     photo, uid)
+  returning id into new_id;
+
+  return new_id;
 end;
 $$;
 
@@ -228,6 +366,7 @@ drop policy if exists "comments read"       on public.comments;
 drop policy if exists "comments insert"     on public.comments;
 drop policy if exists "comments admin del"  on public.comments;
 drop policy if exists "hearts read"         on public.hearts;
+drop policy if exists "hearts own read"     on public.hearts;
 drop policy if exists "views read"          on public.work_views;
 
 -- 自分が投稿者かどうかだけ確認できる
@@ -239,8 +378,11 @@ create policy "settings read"  on public.site_settings for select using (true);
 create policy "works read"     on public.works         for select using (true);
 create policy "posts read"     on public.blog_posts    for select using (true);
 create policy "comments read"  on public.comments      for select using (true);
-create policy "hearts read"    on public.hearts        for select using (true);
-create policy "views read"     on public.work_views    for select using (true);
+
+-- ハートは「自分が押したもの」だけ見える（誰が押したかは他の人に見せない）
+create policy "hearts own read" on public.hearts
+  for select to authenticated using (user_id = auth.uid());
+-- work_views は誰も直接は読めない（数は work_stats() で返す）
 
 -- 書き換えられるのは admins に載っている人だけ
 create policy "settings admin write" on public.site_settings
@@ -252,14 +394,7 @@ create policy "works admin write" on public.works
 create policy "posts admin write" on public.blog_posts
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
--- コメントの書き込み。
--- 管理ページで「Googleログインを必須にする」をONにすると、
--- ログインしていない人の書き込みをサーバー側で弾きます。
-create policy "comments insert" on public.comments for insert
-  with check (
-    auth.uid() is not null
-    or coalesce((select s.require_login_to_comment from public.site_settings s where s.id = 1), false) = false
-  );
+-- コメントの書き込みは create_comment() 経由だけ。直接 insert のルールは作らない。
 
 -- 消せるのは投稿者だけ
 create policy "comments admin del" on public.comments for delete to authenticated using (public.is_admin());
@@ -272,19 +407,32 @@ create policy "comments admin del" on public.comments for delete to authenticate
 -- ------------------------------------------------------------
 grant usage on schema public to anon, authenticated;
 
-grant select on public.works, public.blog_posts, public.site_settings,
-                public.comments, public.hearts, public.work_views,
-                public.work_stats
+grant select on public.works, public.blog_posts, public.site_settings, public.comments
   to anon, authenticated;
 
-grant insert on public.comments to anon, authenticated;
+-- 前の作りで配っていた権限を取り上げる（何度流しても同じ結果になるように）
+revoke insert, update, delete on public.comments   from anon, authenticated;
+revoke all                    on public.hearts     from anon, authenticated;
+revoke all                    on public.work_views from anon, authenticated;
+
+grant select on public.hearts        to authenticated;   -- 見えるのは自分の分だけ（上のルール）
 grant insert, update, delete on public.works, public.blog_posts to authenticated;
 grant update on public.site_settings to authenticated;
-grant delete on public.comments      to authenticated;
+grant delete on public.comments      to authenticated;   -- 実際に消せるのは投稿者だけ（上のルール）
 grant select on public.admins        to authenticated;
 
-grant execute on function public.toggle_heart(text, uuid)  to anon, authenticated;
-grant execute on function public.register_view(text, uuid) to anon, authenticated;
+-- 関数は、書いた人以外が勝手に呼べないよう一度閉じてから、必要な相手にだけ開ける
+revoke execute on function public.toggle_heart(text)  from public;
+revoke execute on function public.create_comment(text, uuid, text, text, text, text, boolean) from public;
+revoke execute on function public.register_view(text, uuid) from public;
+revoke execute on function public.work_stats() from public;
+revoke execute on function public.is_admin() from public;
+revoke execute on function public.can_interact() from public;
+
+grant execute on function public.work_stats()               to anon, authenticated;
+grant execute on function public.register_view(text, uuid)  to anon, authenticated;
+grant execute on function public.toggle_heart(text)         to authenticated;
+grant execute on function public.create_comment(text, uuid, text, text, text, text, boolean) to authenticated;
 grant execute on function public.is_admin() to authenticated;
 
 -- ------------------------------------------------------------

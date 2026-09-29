@@ -110,11 +110,14 @@ window.Profile = (function () {
     if (av?.image) {
       return `<span class="ava" style="${px}"><img src="${esc(av.image)}" alt=""></span>`;
     }
-    if (av?.url) {
+    /* よそから来る写真は Google のものだけ（サーバー側でも同じ条件で弾いている） */
+    if (av?.url && /^https:\/\/lh3\.googleusercontent\.com\//.test(av.url)) {
       return `<span class="ava" style="${px}"><img src="${esc(av.url)}" alt="" referrerpolicy="no-referrer"></span>`;
     }
     const key   = ICONS[av?.icon] ? av.icon : 'camellia';
-    const color = av?.color || COLORS[0];
+    /* 色は #rrggbb だけ通す。コメントの色はよその人が決めた値なので、
+       そのまま HTML に差し込むと、色の代わりにプログラムを仕込まれる */
+    const color = /^#[0-9a-fA-F]{6}$/.test(av?.color || '') ? av.color : COLORS[0];
     const inner = ICONS[key].svg.split('{{bg}}').join(color);
     return `<span class="ava" style="${px};background:${esc(color)}">
               <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true">${inner}</svg>

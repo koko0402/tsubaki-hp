@@ -49,14 +49,20 @@ function buildProfileModal() {
     closeProfile();
   });
 
-  $('#pfGoogleBtn').addEventListener('click', async () => {
-    try { await DB.auth.signInWithGoogle(); }
-    catch (err) { $('#pfMsg').textContent = err.message; }
+  /* Google でログインしている人だけ、Google の写真をアイコンにできる */
+  $('#pfGoogleBtn').addEventListener('click', () => {
+    if (!state.account?.picture) return;
+    pf.url = state.account.picture; pf.image = null; pf.linked = true;
+    pfPaint();
   });
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !$('#profileModal').hidden) closeProfile();
+    if (e.key !== 'Escape') return;
+    if (!$('#loginModal').hidden) closeLogin();
+    else if (!$('#profileModal').hidden) closeProfile();
   });
+
+  buildLoginModal();
 
   buildAvatarMaker();
 }
@@ -278,12 +284,9 @@ function openProfile() {
   $('#pfName').value = p?.name || state.account?.name || '';
   $('#pfMsg').textContent = '';
 
-  const canGoogle = state.online && CFG.enableGoogleLogin;
-  $('#pfGoogle').hidden = !canGoogle;
-  if (canGoogle && state.account) {
-    $('#pfGoogleBtn').querySelector('span').textContent = `${state.account.name} で紐付け済み`;
-    $('#pfGoogleBtn').disabled = true;
-  }
+  $('#pfGoogle').hidden = !state.account?.picture;
+  $('#pfAccount').hidden = !state.account;
+  $('#pfAccountText').textContent = state.account ? `${accountLabel()}でログイン中` : '';
 
   pfPaint();
   $('#profileModal').hidden = false;
@@ -316,10 +319,93 @@ function saveProfile() {
 }
 
 /* ============================================================
+   ログイン
+   ------------------------------------------------------------
+   見るだけならログインはいらない。いいね・コメントはログインが要る。
+   本番は Google、見本モードは「見本ユーザー」でログインしたことにする。
+   ============================================================ */
+function accountLabel() {
+  if (!state.account) return '';
+  return state.online ? (state.account.email || state.account.name || 'Google') : '見本ユーザー';
+}
+
+function buildLoginModal() {
+  $$('[data-loginclose]').forEach(el => el.addEventListener('click', closeLogin));
+
+  $('#loginGoogle').addEventListener('click', async () => {
+    $('#loginMsg').textContent = '';
+    try { await DB.auth.signInWithGoogle(); }   /* Google の画面へ移って、戻ってきたら起動し直す */
+    catch (err) { $('#loginMsg').textContent = err.message; }
+  });
+
+  $('#loginDemo').addEventListener('click', async () => {
+    await Demo.auth.signIn();
+    closeLogin();
+    await afterAuthChange();
+    toast('ログインした');
+  });
+}
+
+/** why: どうしてログインが要るのかを一言（「いいねするには」など） */
+function openLogin(why) {
+  $('#loginLead').innerHTML = why
+    ? `${esc(why)}、ログインが必要です。<br>見るだけなら、ログインはいりません。`
+    : '見るだけなら、ログインはいりません。<br>いいね・コメントは、ログインするとできます。';
+  $('#loginMsg').textContent = '';
+  $('#loginGoogle').hidden   = !state.online;
+  $('#loginDemo').hidden     = state.online;
+  $('#loginDemoNote').hidden = state.online;
+  $('#loginModal').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLogin() {
+  $('#loginModal').hidden = true;
+  if ($('#lightbox').hidden && $('#profileModal').hidden) document.body.style.overflow = '';
+}
+
+async function logout() {
+  if (!confirm('ログアウトします。よろしいですか？')) return;
+  await authApi.signOut();
+  closeProfile();
+  await afterAuthChange();
+  toast('ログアウトした');
+}
+
+/** ログインしたのにプロフィールが無ければ、アカウントの名前で作っておく */
+function ensureProfile() {
+  if (!state.account || Profile.get()) return;
+  try {
+    Profile.save({
+      name: state.account.name || 'ななし',
+      icon: 'camellia', color: Profile.COLORS[0],
+      url: state.account.picture, linked: !!state.account.picture,
+    });
+  } catch {}
+}
+
+/** ログイン／ログアウトのあと、自分が押したハートと画面を合わせ直す */
+async function afterAuthChange() {
+  state.account = await authApi.account().catch(() => null);
+  ensureProfile();
+  try {
+    const data = await api.loadAll();
+    state.myHearts = data.myHearts;
+    state.stats = data.stats;
+  } catch (err) { console.warn(err); }
+
+  renderProfileChip();
+  renderCommentForm();
+  refreshWriteBoxes();
+  reRenderCurrent();
+  if (!lb.root.hidden && lb.id) lbRenderStats(lb.id);
+}
+
+/* ============================================================
    コメントを書ける状態か
    ============================================================ */
 function commentCheck() {
-  if (state.site.requireLogin && !state.account) return { ok: false, why: 'google' };
+  if (!state.account) return { ok: false, why: 'login' };
   if (!Profile.get()) return { ok: false, why: 'profile' };
   return { ok: true };
 }
@@ -341,9 +427,9 @@ function renderCommentForm() {
 
   form.hidden = true;
   gate.hidden = false;
-  gate.innerHTML = check.why === 'google'
-    ? `<p>コメントするには、Googleでのログインが必要です。</p>
-       <button type="button" data-google-login>Googleでログイン</button>`
+  gate.innerHTML = check.why === 'login'
+    ? `<p>コメントするには、ログインが必要です。</p>
+       <button type="button" data-open-login="コメントするには">ログインする</button>`
     : `<p>コメントするには、なまえとアイコンが必要です。</p>
        <button type="button" data-open-profile>プロフィールを作る</button>`;
 }

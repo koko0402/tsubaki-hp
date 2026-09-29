@@ -172,10 +172,34 @@ window.Demo = (function () {
     text: row.body,
     date: row.date,
     avatar: { icon: row.avatarIcon, color: row.avatarColor, url: row.avatarUrl },
-    verified: false,
   });
 
   const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+
+  /* ============================================================
+     ログイン（見本）
+     ------------------------------------------------------------
+     本番は Google でログインするけれど、見本モードにはサーバーが無い。
+     なので「見本ユーザー」でログインしたことにして、ボタン1つで試せるようにする。
+     ログインしないといいね・コメントできないのは本番と同じ。
+     ============================================================ */
+  const AKEY = 'tsubaki.demo.account';
+
+  const auth = {
+    async account() {
+      try { return JSON.parse(localStorage.getItem(AKEY)) || null; } catch { return null; }
+    },
+    async signIn() {
+      const a = { id: 'demo-user', email: '', name: '見本ユーザー', picture: null };
+      try { localStorage.setItem(AKEY, JSON.stringify(a)); } catch {}
+      return a;
+    },
+    async signOut() { try { localStorage.removeItem(AKEY); } catch {} },
+  };
+
+  async function needLogin() {
+    if (!(await auth.account())) throw new Error('ログインが必要です');
+  }
 
   /* ============================================================
      見る側
@@ -220,7 +244,6 @@ window.Demo = (function () {
           bgImage: s?.bg_image || '',
           bgMode:  s?.bg_mode  || 'cover',
           bgDim:   s?.bg_dim ?? 0.25,
-          requireLogin: false,   /* 見本モードではサーバーが無いので常に false */
         },
         pickup: {
           message:      s?.pickup_message || '',
@@ -231,7 +254,8 @@ window.Demo = (function () {
         gallery,
         blog: posts.sort(byDateDesc),
         stats,
-        myHearts: new Set(heartList),
+        /* ログアウト中は「自分が押したハート」は無いものとして見せる（本番と同じ） */
+        myHearts: new Set((await auth.account()) ? heartList : []),
       };
     },
 
@@ -256,6 +280,7 @@ window.Demo = (function () {
     },
 
     async addComment(workId, profile, text, parentId = null) {
+      await needLogin();
       const now = new Date().toISOString();
       await put('comments', {
         id: uid(), workId, parentId: parentId || null,
@@ -268,6 +293,7 @@ window.Demo = (function () {
     },
 
     async toggleHeart(workId) {
+      await needLogin();
       const list = (await getKey('meta', 'hearts')) || [];
       const on = !list.includes(workId);
       await put('meta', on ? list.concat(workId) : list.filter(x => x !== workId), 'hearts');
@@ -418,5 +444,5 @@ window.Demo = (function () {
     },
   };
 
-  return { init, api, admin, imageUrl };
+  return { init, api, admin, auth, imageUrl };
 })();

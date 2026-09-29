@@ -963,6 +963,20 @@ body.has-bg::before{ opacity:.12; }
 .pf-del:hover{ color:var(--camellia); border-color:var(--camellia); }
 .pf-msg{ margin:12px 0 0; min-height:1.2em; font-size:12.5px; color:var(--camellia); text-align:center; }
 
+/* ログイン中のアカウントと、ログアウト */
+.pf-account{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-top:14px; padding-top:14px; border-top:1px dashed rgba(0,0,0,.18);
+  font-size:12.5px; color:var(--ink-soft);
+}
+.pf-account[hidden]{ display:none; }
+
+/* ログインの画面。中身が少ないので細めに */
+.login-card{ max-width:380px; text-align:center; }
+.login-card .pf-gbtn,
+.login-card .pf-save{ width:100%; justify-content:center; margin-top:18px; min-height:46px; }
+.login-card [hidden]{ display:none; }
+
 /* ============================================================
    お知らせ（トースト）
    ============================================================ */

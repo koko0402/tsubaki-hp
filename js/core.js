@@ -54,8 +54,7 @@ const state = {
   tag:    '',
   site:   { title: '', tagline: '', links: [], artists: {},
             bgImage: '', bgMode: 'cover', bgDim: .25,
-            theme: {}, sections: {}, customCss: '',
-            requireLogin: false },
+            theme: {}, sections: {}, customCss: '' },
   pickup: { message: '', workIds: [], youtubeId: '', youtubeTitle: '' },
   gallery: [],
   blog: [],
@@ -69,7 +68,8 @@ const state = {
   feedShown: 0,
 };
 
-let api;
+let api;       /* 読み書き。本番なら DB.api、見本なら Demo.api */
+let authApi;   /* ログイン。本番なら DB.auth、見本なら Demo.auth */
 
 const statOf   = id => state.stats[id] || { views: 0, hearts: 0, comments: 0 };
 const workById = id => state.gallery.find(w => w.id === id);

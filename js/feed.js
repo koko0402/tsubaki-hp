@@ -56,7 +56,11 @@ function renderHeader() {
 function renderProfileChip() {
   const p = Profile.get();
   const chip = $('#profileChip');
-  if (p) {
+  if (!state.account) {
+    chip.className = 'topbar-profile is-empty';
+    chip.innerHTML = '<span>ログイン</span>';
+    chip.title = 'いいね・コメントするにはログイン';
+  } else if (p) {
     chip.className = 'topbar-profile';
     chip.innerHTML = `${avatar(p, 26)}<span>${esc(p.name)}</span>`;
     chip.title = 'プロフィールを変える';
@@ -111,10 +115,10 @@ function renderPickup() {
 function writeBoxHTML(id) {
   const check = commentCheck();
   if (!check.ok) {
-    const label = check.why === 'google'
-      ? 'コメントするにはGoogleログインが必要です'
+    const label = check.why === 'login'
+      ? 'ログインするとコメントできます'
       : 'コメントするにはプロフィールが必要です';
-    const attr  = check.why === 'google' ? 'data-google-login' : 'data-open-profile';
+    const attr  = check.why === 'login' ? 'data-open-login="コメントするには"' : 'data-open-profile';
     return `<button type="button" class="need-profile" ${attr}>${label}</button>`;
   }
   const p = Profile.get();
@@ -252,7 +256,7 @@ async function fillPostComments(ids) {
         <div class="post-c">
           ${avatar(c.avatar, 26)}
           <div class="c-main">
-            <span class="c-name">${esc(c.name || 'ななし')}</span>${c.verified ? '<span class="c-verified" title="ログイン済み">✓</span>' : ''}
+            <span class="c-name">${esc(c.name || 'ななし')}</span>
             <p class="c-text">${esc(c.text)}</p>
           </div>
         </div>`).join('') +

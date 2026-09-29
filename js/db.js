@@ -85,8 +85,13 @@ window.DB = (function () {
     text: row.body,
     date: String(row.created_at).slice(0, 10),
     avatar: { icon: row.avatar_icon, color: row.avatar_color, url: row.avatar_url },
-    verified: !!row.user_id,
   });
+
+  /** ログイン中の人のID（していなければ null）。通信せずに手元の情報だけで見る */
+  async function currentUserId() {
+    const { data } = await sb.auth.getSession();
+    return data.session?.user?.id || null;
+  }
 
   /* ============================================================
      見る側
@@ -95,13 +100,14 @@ window.DB = (function () {
     online: true,
 
     async loadAll() {
-      const me = visitorId();
+      const me = await currentUserId();
       const [settings, works, posts, stats, mine] = await Promise.all([
         sb.from('site_settings').select('*').eq('id', 1).maybeSingle(),
         sb.from('works').select('*').order('posted_on', { ascending: false }).order('created_at', { ascending: false }),
         sb.from('blog_posts').select('*').order('posted_on', { ascending: false }),
-        sb.from('work_stats').select('*'),
-        sb.from('hearts').select('work_id').eq('visitor_id', me),
+        sb.rpc('work_stats'),
+        /* 自分が押したハート。ログインしていなければ空 */
+        me ? sb.from('hearts').select('work_id').eq('user_id', me) : Promise.resolve({ data: [] }),
       ]);
 
       const s = ok(settings, 'サイト設定の読み込み') || {};
@@ -130,7 +136,6 @@ window.DB = (function () {
           bgImage: s.bg_image || '',
           bgMode:  s.bg_mode  || 'cover',
           bgDim:   s.bg_dim ?? 0.25,
-          requireLogin: !!s.require_login_to_comment,
         },
         pickup: {
           message:      s.pickup_message || '',
@@ -172,24 +177,23 @@ window.DB = (function () {
       return out;
     },
 
+    /* 書いた人と日時はサーバーが決める。ここから送るのは中身と、なまえ・アイコンだけ */
     async addComment(workId, profile, text, parentId = null) {
-      const user = (await sb.auth.getUser()).data.user;
-      ok(await sb.from('comments').insert({
-        work_id:      workId,
-        parent_id:    parentId || null,
-        name:         profile.name,
-        body:         text,
-        avatar_icon:  profile.url ? null : profile.icon,
-        avatar_color: profile.url ? null : profile.color,
-        avatar_url:   profile.url || null,
-        visitor_id:   visitorId(),
-        user_id:      user?.id || null,
-      }), 'コメントの送信');
+      const res = await sb.rpc('create_comment', {
+        p_work_id:   workId,
+        p_parent_id: parentId || null,
+        p_body:      text,
+        p_name:      profile.name,
+        p_icon:      profile.icon,
+        p_color:     profile.color,
+        p_use_photo: !!profile.url,
+      });
+      if (res.error) throw new Error(res.error.message);
     },
 
-    /** 押した後の状態(true/false)を返す */
+    /** 押した後の状態(true/false)を返す。ログインしていないとエラー */
     async toggleHeart(workId) {
-      const res = await sb.rpc('toggle_heart', { p_work_id: workId, p_visitor: visitorId() });
+      const res = await sb.rpc('toggle_heart', { p_work_id: workId });
       if (res.error) throw new Error('ハートの更新: ' + res.error.message);
       return res.data === true;
     },
@@ -211,7 +215,7 @@ window.DB = (function () {
     async signOut() { await sb.auth.signOut(); },
     async user() { return (await sb.auth.getUser()).data.user || null; },
 
-    /** 見に来た人が Google でログインする（プロフィールの紐付け用） */
+    /** 見に来た人が Google でログインする（いいね・コメントに必要） */
     async signInWithGoogle() {
       const res = await sb.auth.signInWithOAuth({
         provider: 'google',

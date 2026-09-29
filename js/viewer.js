@@ -88,7 +88,7 @@ function commentHTML(c, isReply) {
       ${avatar(c.avatar, isReply ? 24 : 30)}
       <div class="c-main">
         <div class="c-head">
-          <span class="c-name">${esc(c.name || 'ななし')}${c.verified ? '<span class="c-verified" title="ログイン済み">✓</span>' : ''}</span>
+          <span class="c-name">${esc(c.name || 'ななし')}</span>
           <time>${fmtDate(c.date)}</time>
         </div>
         <p class="c-text">${esc(c.text)}</p>
@@ -143,7 +143,12 @@ function openReplyBox(rootId, toName) {
   if (opened) opened.remove();
   if (sameSpot) return;
 
-  if (!commentCheck().ok) { toast('なまえとアイコンを決めると返信できます'); openProfile(); return; }
+  const check = commentCheck();
+  if (!check.ok) {
+    if (check.why === 'login') openLogin('返信するには');
+    else { toast('なまえとアイコンを決めると返信できます'); openProfile(); }
+    return;
+  }
 
   const p = Profile.get();
   const box = document.createElement('form');
@@ -183,7 +188,7 @@ async function submitReply(box) {
     patchPost(id);
   } catch (err) {
     console.warn(err);
-    toast('返信を送れませんでした');
+    toast(err.message || '返信を送れませんでした');
     input.disabled = false; btn.disabled = false;
   }
 }
@@ -313,6 +318,7 @@ function stepLightbox(dir) {
 
 async function toggleHeartFor(id, btn) {
   if (!id) return;
+  if (!state.account) { openLogin('いいねするには'); return; }
   if (btn) btn.disabled = true;
   try {
     const on = await api.toggleHeart(id);
@@ -350,7 +356,7 @@ async function submitComment(e) {
     fillPostComments([id]);
   } catch (err) {
     console.warn(err);
-    toast('コメントを送れませんでした');
+    toast(err.message || 'コメントを送れませんでした');
   } finally {
     btn.disabled = false;
   }
@@ -376,7 +382,7 @@ async function submitInline(form) {
     if (!lb.root.hidden && lb.id === id) { lbRenderStats(id); loadComments(id); }
   } catch (err) {
     console.warn(err);
-    toast('コメントを送れませんでした');
+    toast(err.message || 'コメントを送れませんでした');
   } finally {
     input.disabled = false; if (btn) btn.disabled = false;
   }

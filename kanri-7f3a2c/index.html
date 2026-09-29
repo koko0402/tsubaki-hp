@@ -316,13 +316,6 @@ a{ color:var(--gold); }
           <code>leaf</code> <code>drop</code> <code>note</code> <code>heart</code>
         </p>
 
-        <label class="inline"><input type="checkbox" id="sRequireLogin">
-          コメントに Google ログインを必須にする</label>
-        <p class="hint" id="sRequireHint">
-          オフのとき: なまえ＋アイコンを作れば誰でもコメントできます（画面側のお願いベース）。<br>
-          オンのとき: ログインしていない書き込みを<b>サーバー側で弾きます</b>。荒らされたらこちらへ。
-        </p>
-
         <div class="actions">
           <button id="sSave">保存する</button>
           <span id="sMsg" class="msg"></span>
@@ -543,10 +536,6 @@ async function enter(me) {
       await Demo.admin.reset();
       location.reload();
     });
-    /* 見本モードにはサーバーが無いので、この設定は効かない */
-    $('#sRequireLogin').disabled = true;
-    $('#sRequireHint').innerHTML =
-      'この設定はサーバー（Supabase）をつないでから使えます。見本モードでは効きません。';
   } else {
     $('#signout').addEventListener('click', async () => {
       await DB.auth.signOut();
@@ -867,7 +856,6 @@ function fillSettings() {
   $('#sYtTitle').value   = settings.youtube_title || '';
   $('#sLinks').value     = JSON.stringify(settings.links || [], null, 2);
   $('#sArtists').value   = JSON.stringify(settings.artists || {}, null, 2);
-  $('#sRequireLogin').checked = !!settings.require_login_to_comment;
   fillBackground();
   fillLook();
 }
@@ -980,7 +968,6 @@ $('#sSave').addEventListener('click', async () => {
       pickup_message: $('#sPickupMsg').value.trim(),
       youtube_id: $('#sYtId').value.trim(),
       youtube_title: $('#sYtTitle').value.trim(),
-      require_login_to_comment: $('#sRequireLogin').checked,
       links, artists,
     });
     settings = await ADMIN.settings();

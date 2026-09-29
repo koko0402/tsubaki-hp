@@ -73,14 +73,18 @@ function bindUI() {
     const sh = e.target.closest('[data-share]');
     if (sh) { share(sh.dataset.share); return; }
 
-    if (e.target.closest('[data-open-profile]') || e.target.closest('#profileChip')) {
-      openProfile(); return;
-    }
+    const needLogin = e.target.closest('[data-open-login]');
+    if (needLogin) { openLogin(needLogin.dataset.openLogin); return; }
 
-    if (e.target.closest('[data-google-login]')) {
-      DB.auth.signInWithGoogle().catch(err => toast(err.message));
+    if (e.target.closest('[data-logout]')) { logout(); return; }
+
+    /* 上のバーの丸。ログインしていなければログイン、していればプロフィール */
+    if (e.target.closest('#profileChip')) {
+      if (state.account) openProfile(); else openLogin();
       return;
     }
+
+    if (e.target.closest('[data-open-profile]')) { openProfile(); return; }
 
     const nav = e.target.closest('.bottomnav [data-page]');
     if (nav) { showPage(nav.dataset.page); return; }
@@ -185,8 +189,8 @@ async function boot() {
       DB.init();
       data = await DB.api.loadAll();
       api = DB.api;
+      authApi = DB.auth;
       state.online = true;
-      state.account = await DB.auth.account().catch(() => null);
     } catch (err) {
       console.error('[椿HP] サーバーから読み込めませんでした:', err);
       showModeNote('サーバーにつながらないため、見本モードで表示しています。');
@@ -197,21 +201,15 @@ async function boot() {
 
   if (!data) {
     api = Demo.api;
+    authApi = Demo.auth;
     data = await Demo.api.loadAll();
   }
 
   Object.assign(state, data);
+  state.account = await authApi.account().catch(() => null);
 
-  /* Googleでログインしたばかりで、まだプロフィールが無いなら作っておく */
-  if (state.account && !Profile.get()) {
-    try {
-      Profile.save({
-        name: state.account.name || 'ななし',
-        icon: 'camellia', color: Profile.COLORS[0],
-        url: state.account.picture, linked: true,
-      });
-    } catch {}
-  }
+  /* ログインしたばかりで、まだプロフィールが無いなら作っておく */
+  ensureProfile();
 
   applyLook();          /* 色・ページの出し分け・自分で足したCSS */
   renderHeader();

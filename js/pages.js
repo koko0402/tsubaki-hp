@@ -149,11 +149,18 @@ function renderBlog() {
    ============================================================ */
 function renderMe() {
   const p = Profile.get();
-  $('#meCard').innerHTML = p
+  $('#meCard').innerHTML = !state.account
+    ? `${avatar(null, 64)}
+       <div class="me-info">
+         <p class="me-name">ログインしていません</p>
+         <p class="me-note">見るだけならこのままで大丈夫。いいね・コメントはログインするとできます。</p>
+       </div>
+       <button type="button" data-open-login>ログイン</button>`
+    : p
     ? `${avatar(p, 64)}
        <div class="me-info">
          <p class="me-name">${esc(p.name)}</p>
-         <p class="me-note">${p.linked ? 'Googleアカウントと紐付け済み' : 'この端末に保存されています'}</p>
+         <p class="me-note">${esc(accountLabel())}でログイン中</p>
        </div>
        <button type="button" data-open-profile>変える</button>`
     : `${avatar(null, 64)}

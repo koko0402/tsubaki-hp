@@ -18,10 +18,7 @@ window.TSUBAKI_CONFIG = {
 
   storageBucket:   'art',
 
-  /* 見に来た人がプロフィールを Google と紐付けられるようにするか。
-     true にすると、プロフィール画面に「Googleアカウントを使う」が出ます。
-     使うには Supabase 側で Google ログインを有効にする必要があります
-     （SETUP.md の「Googleログインを使う場合」を参照）。
-     false でも、なまえ＋アイコンを作ればコメントできます。 */
-  enableGoogleLogin: false,
+  /* 見に来た人のログインは Google です。見るだけならログインはいりません。
+     いいね・コメントをするにはログインが必要なので、
+     Supabase 側で Google ログインを有効にしてください（SETUP.md の手順8）。 */
 };
