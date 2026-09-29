@@ -233,7 +233,8 @@ function showLbImage(at) {
   $('#lbNext').setAttribute('aria-label', inside ? '次の画像' : '次の絵');
 }
 
-async function openLightbox(id, at = 0) {
+/** opts.toComments: 開いたらコメント欄のところまで送る（フィードの「コメント」から来たとき） */
+async function openLightbox(id, at = 0, opts = {}) {
   const w = workById(id);
   if (!w) return;
   lb.id = id;
@@ -257,6 +258,15 @@ async function openLightbox(id, at = 0) {
   lb.root.hidden = false;
   document.body.style.overflow = 'hidden';
   $('#lbHeartBtn').focus({ preventScroll: true });
+
+  const side = $('.lb-side');
+  side.scrollTop = 0;
+  if (opts.toComments) {
+    requestAnimationFrame(() => {
+      const head = $('.lb-subhead', side);
+      side.scrollTop = Math.max(0, head.getBoundingClientRect().top - side.getBoundingClientRect().top - 12);
+    });
+  }
 
   loadComments(id);
 
@@ -433,6 +443,10 @@ function bindLightbox() {
     lb.stage.setPointerCapture(e.pointerId);
     lb.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
+    /* 指1本・拡大していないときは、スワイプの始まりとして覚えておく */
+    lb.swipe = (lb.pointers.size === 1 && lb.scale <= 1.01 && e.pointerType !== 'mouse')
+      ? { x: e.clientX, y: e.clientY, t: Date.now() } : null;
+
     if (lb.pointers.size === 2) {
       const [p1, p2] = [...lb.pointers.values()];
       lb.pinchStart = Math.hypot(p1.x - p2.x, p1.y - p2.y);
@@ -451,9 +465,17 @@ function bindLightbox() {
     lb.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     if (lb.pointers.size === 2 && lb.pinchStart > 0) {
+      lb.swipe = null;
       const [p1, p2] = [...lb.pointers.values()];
       const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
       lbZoomTo(lb.pinchScale * (dist / lb.pinchStart), (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    } else if (lb.swipe) {
+      /* 下に引いている間は、絵も一緒に下がる（離すと閉じる合図） */
+      const dy = e.clientY - lb.swipe.y, dx = e.clientX - lb.swipe.x;
+      if (dy > 0 && Math.abs(dy) > Math.abs(dx)) {
+        lb.img.style.transform = `translateY(${dy}px) scale(${Math.max(.85, 1 - dy / 1200)})`;
+        lb.img.style.opacity = String(Math.max(.4, 1 - dy / 500));
+      }
     } else if (lb.panning) {
       lb.tx = e.clientX - lb.panX;
       lb.ty = e.clientY - lb.panY;
@@ -463,6 +485,20 @@ function bindLightbox() {
 
   const endPointer = e => {
     lb.pointers.delete(e.pointerId);
+
+    /* スワイプの判定。下へ引いたら閉じる、横に払ったら前後の絵へ */
+    if (lb.swipe && lb.pointers.size === 0) {
+      const dx = e.clientX - lb.swipe.x, dy = e.clientY - lb.swipe.y;
+      const quick = Date.now() - lb.swipe.t < 600;
+      lb.swipe = null;
+      lb.img.style.opacity = '';
+      if (e.type === 'pointerup' && dy > 110 && Math.abs(dx) < 80) { closeLightbox(); return; }
+      lbApply();   /* 引っぱった絵を元の位置に戻す */
+      if (e.type === 'pointerup' && quick && Math.abs(dx) > 60 && Math.abs(dy) < 60) {
+        stepLightbox(dx < 0 ? 1 : -1);
+        return;
+      }
+    }
     if (lb.pointers.size < 2) lb.pinchStart = 0;
     if (lb.pointers.size === 0) {
       lb.panning = false;

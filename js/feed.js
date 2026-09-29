@@ -165,7 +165,7 @@ function postHTML(w) {
         <svg aria-hidden="true"><use href="#${on ? 'ic-heart' : 'ic-heart-o'}"/></svg>
         <span>${on ? 'いいね済み' : 'いいね'}</span>
       </button>
-      <button type="button" data-open="${esc(w.id)}">
+      <button type="button" data-open-comments="${esc(w.id)}">
         <svg aria-hidden="true"><use href="#ic-comment"/></svg><span>コメント</span>
       </button>
       <button type="button" data-share="${esc(w.id)}">

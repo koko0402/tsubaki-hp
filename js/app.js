@@ -20,6 +20,45 @@ function goHome() {
 }
 
 /* ============================================================
+   フィードの絵のタップ
+   ------------------------------------------------------------
+   1回なら拡大表示。すぐにもう1回なら、いいね（外すことはしない）。
+   1回か2回かを見分けるために、1回目は少しだけ待ってから開く。
+   ============================================================ */
+const DOUBLE_TAP_MS = 260;
+let tapWait = null;
+
+function tapFeedImage(img) {
+  const id = img.dataset.open;
+  if (tapWait && tapWait.id === id) {
+    clearTimeout(tapWait.timer);
+    tapWait = null;
+    likeByDoubleTap(id, img.closest('.post-media'));
+    return;
+  }
+  if (tapWait) clearTimeout(tapWait.timer);
+  const at = Number(img.dataset.at) || 0;
+  tapWait = {
+    id,
+    timer: setTimeout(() => { tapWait = null; openLightbox(id, at); }, DOUBLE_TAP_MS),
+  };
+}
+
+function likeByDoubleTap(id, media) {
+  if (!state.account) { openLogin('いいねするには'); return; }
+
+  const pop = document.createElement('span');
+  pop.className = 'pop-heart';
+  pop.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.8 4 13a4.9 4.9 0 0 1 7-6.9l1 1 1-1a4.9 4.9 0 0 1 7 6.9z"/></svg>';
+  media.appendChild(pop);
+  setTimeout(() => pop.remove(), 900);
+
+  if (!state.myHearts.has(id)) {
+    toggleHeartFor(id, $(`.post[data-work="${CSS.escape(id)}"] [data-heart]`));
+  }
+}
+
+/* ============================================================
    もっと読み込む
    ============================================================ */
 function bindInfiniteScroll() {
@@ -64,8 +103,16 @@ function bindUI() {
     const tagBtn = e.target.closest('[data-tag]');
     if (tagBtn) { e.preventDefault(); setTag(tagBtn.dataset.tag); return; }
 
+    const toComments = e.target.closest('[data-open-comments]');
+    if (toComments) { openLightbox(toComments.dataset.openComments, 0, { toComments: true }); return; }
+
     const open = e.target.closest('[data-open]');
-    if (open) { openLightbox(open.dataset.open, Number(open.dataset.at) || 0); return; }
+    if (open) {
+      /* フィードの絵は、1回タップで拡大、2回タップでいいね */
+      if (open.tagName === 'IMG' && open.closest('.post-media')) { tapFeedImage(open); return; }
+      openLightbox(open.dataset.open, Number(open.dataset.at) || 0);
+      return;
+    }
 
     const heart = e.target.closest('[data-heart]');
     if (heart) { toggleHeartFor(heart.dataset.heart, heart); return; }
@@ -102,7 +149,12 @@ function bindUI() {
     const btn = e.target.closest?.('[data-open]');
     if (!btn || btn.tagName === 'BUTTON') return;
     e.preventDefault();
-    openLightbox(btn.dataset.open, Number(btn.dataset.at) || 0);
+    openLightbox(btn.dataset.open, Number(btn.dataset.at) || 0);   /* キーボードは待たずにすぐ開く */
+  });
+
+  /* ブラウザの「ダブルタップで拡大」がフィードの絵で起きないように */
+  document.addEventListener('dblclick', e => {
+    if (e.target.closest?.('.post-media img')) e.preventDefault();
   });
 
   $('#topHome').addEventListener('click', goHome);
